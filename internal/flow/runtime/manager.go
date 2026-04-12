@@ -28,9 +28,7 @@ func (m *Manager) Start(ctx context.Context, id uuid.UUID, g graph.Graph) error 
 	}
 	m.mu.Lock()
 	if prev, ok := m.flows[id]; ok {
-		m.mu.Unlock()
 		prev.Stop()
-		m.mu.Lock()
 	}
 	m.flows[id] = cf
 	m.mu.Unlock()

@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"testing"
 	"time"
 
@@ -131,6 +132,35 @@ func TestManager_StartOnAlreadyRunningIDReplacesCleanly(t *testing.T) {
 	require.NoError(t, mgr.Start(context.Background(), id, singleSinkGraph()))
 
 	assert.True(t, mgr.Running(id))
+	mgr.StopAll()
+	assert.False(t, mgr.Running(id))
+}
+
+// TestManager_ConcurrentStartSameID verifies that calling Start concurrently
+// with the same id never leaves more than one CompiledFlow registered and does
+// not panic or race (run with -race).
+func TestManager_ConcurrentStartSameID(t *testing.T) {
+	const goroutines = 8
+	mgr := NewManager()
+	id := uuid.New()
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for i := 0; i < goroutines; i++ {
+		go func() {
+			defer wg.Done()
+			// Ignore errors — Start may fail if Compile races, but must not panic.
+			_ = mgr.Start(context.Background(), id, singleSinkGraph())
+		}()
+	}
+	wg.Wait()
+
+	// Exactly one CompiledFlow should be registered.
+	mgr.mu.Lock()
+	count := len(mgr.flows)
+	mgr.mu.Unlock()
+	assert.Equal(t, 1, count)
+
 	mgr.StopAll()
 	assert.False(t, mgr.Running(id))
 }
