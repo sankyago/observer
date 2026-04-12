@@ -7,8 +7,10 @@ import (
 	"os"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/sankyago/observer/internal/flow/graph"
 	"github.com/sankyago/observer/internal/flow/nodes"
+	"github.com/sankyago/observer/internal/ingest"
 	"github.com/sankyago/observer/internal/model"
 )
 
@@ -26,14 +28,14 @@ type nodeRuntime struct {
 	out  chan model.SensorReading
 }
 
-func Compile(g graph.Graph) (*CompiledFlow, error) {
-	return CompileWithSinkWriter(g, os.Stderr)
+func Compile(flowID uuid.UUID, g graph.Graph, router *ingest.Router) (*CompiledFlow, error) {
+	return CompileWithSinkWriter(flowID, g, router, os.Stderr)
 }
 
-func CompileWithSinkWriter(g graph.Graph, sinkOut io.Writer) (*CompiledFlow, error) {
+func CompileWithSinkWriter(flowID uuid.UUID, g graph.Graph, router *ingest.Router, sinkOut io.Writer) (*CompiledFlow, error) {
 	instances := make(map[string]*nodeRuntime, len(g.Nodes))
 	for _, n := range g.Nodes {
-		inst, err := buildNode(n, sinkOut)
+		inst, err := buildNode(n, flowID, router, sinkOut)
 		if err != nil {
 			return nil, err
 		}
@@ -66,10 +68,10 @@ func CompileWithSinkWriter(g graph.Graph, sinkOut io.Writer) (*CompiledFlow, err
 	return cf, nil
 }
 
-func buildNode(n graph.Node, sinkOut io.Writer) (nodes.Node, error) {
+func buildNode(n graph.Node, flowID uuid.UUID, router *ingest.Router, sinkOut io.Writer) (nodes.Node, error) {
 	switch n.Type {
-	case "mqtt_source":
-		return nodes.NewMQTTSource(n.ID, n.Data)
+	case "device_source":
+		return nodes.NewDeviceSource(n.ID, flowID, router, n.Data)
 	case "threshold":
 		return nodes.NewThreshold(n.ID, n.Data)
 	case "rate_of_change":

@@ -15,6 +15,7 @@ import (
 	"github.com/sankyago/observer/internal/flow"
 	"github.com/sankyago/observer/internal/flow/runtime"
 	"github.com/sankyago/observer/internal/flow/store"
+	"github.com/sankyago/observer/internal/ingest"
 )
 
 func main() {
@@ -35,8 +36,9 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
+	router := ingest.NewRouter()
 	repo := store.NewRepo(pool)
-	mgr := runtime.NewManager()
+	mgr := runtime.NewManager(router)
 	svc := flow.NewService(ctx, repo, mgr)
 
 	if err := svc.LoadEnabled(ctx); err != nil {

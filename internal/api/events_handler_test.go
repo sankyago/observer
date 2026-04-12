@@ -13,6 +13,7 @@ import (
 	"github.com/sankyago/observer/internal/flow"
 	"github.com/sankyago/observer/internal/flow/nodes"
 	"github.com/sankyago/observer/internal/flow/runtime"
+	"github.com/sankyago/observer/internal/ingest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +26,7 @@ var wsDialer = websocket.DefaultDialer
 func newEnabledFlowService(t *testing.T) (*flow.Service, uuid.UUID) {
 	t.Helper()
 	repo := newFakeRepo()
-	mgr := runtime.NewManager()
+	mgr := runtime.NewManager(ingest.NewRouter())
 	svc := flow.NewService(context.Background(), repo, mgr)
 
 	g := debugOnlyGraph()

@@ -6,19 +6,21 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sankyago/observer/internal/flow/graph"
+	"github.com/sankyago/observer/internal/ingest"
 )
 
 type Manager struct {
-	mu    sync.Mutex
-	flows map[uuid.UUID]*CompiledFlow
+	mu     sync.Mutex
+	flows  map[uuid.UUID]*CompiledFlow
+	router *ingest.Router
 }
 
-func NewManager() *Manager {
-	return &Manager{flows: make(map[uuid.UUID]*CompiledFlow)}
+func NewManager(router *ingest.Router) *Manager {
+	return &Manager{flows: make(map[uuid.UUID]*CompiledFlow), router: router}
 }
 
 func (m *Manager) Start(ctx context.Context, id uuid.UUID, g graph.Graph) error {
-	cf, err := Compile(g)
+	cf, err := Compile(id, g, m.router)
 	if err != nil {
 		return err
 	}

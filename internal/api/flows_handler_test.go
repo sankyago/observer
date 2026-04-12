@@ -16,6 +16,7 @@ import (
 	"github.com/sankyago/observer/internal/flow/graph"
 	"github.com/sankyago/observer/internal/flow/runtime"
 	"github.com/sankyago/observer/internal/flow/store"
+	"github.com/sankyago/observer/internal/ingest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -112,7 +113,7 @@ func debugOnlyGraph() graph.Graph {
 func newTestService(t *testing.T) (*flow.Service, *fakeRepo) {
 	t.Helper()
 	repo := newFakeRepo()
-	mgr := runtime.NewManager()
+	mgr := runtime.NewManager(ingest.NewRouter())
 	svc := flow.NewService(context.Background(), repo, mgr)
 	return svc, repo
 }
@@ -357,7 +358,7 @@ var errDB = errors.New("db unavailable")
 // the repo maps to 500, not 400.
 func TestCreateFlow_RepoError_Returns500(t *testing.T) {
 	repo := &errRepo{fakeRepo: newFakeRepo(), createErr: errDB}
-	mgr := runtime.NewManager()
+	mgr := runtime.NewManager(ingest.NewRouter())
 	svc := flow.NewService(context.Background(), repo, mgr)
 
 	body, _ := json.Marshal(map[string]any{"name": "x", "graph": debugOnlyGraph()})
@@ -370,7 +371,7 @@ func TestCreateFlow_RepoError_Returns500(t *testing.T) {
 func TestUpdateFlow_RepoError_Returns500(t *testing.T) {
 	inner := newFakeRepo()
 	repo := &errRepo{fakeRepo: inner}
-	mgr := runtime.NewManager()
+	mgr := runtime.NewManager(ingest.NewRouter())
 	svc := flow.NewService(context.Background(), repo, mgr)
 
 	// Create a flow first using the underlying repo directly.

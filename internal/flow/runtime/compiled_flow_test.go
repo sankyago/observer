@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sankyago/observer/internal/flow/graph"
+	"github.com/sankyago/observer/internal/ingest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,7 +38,7 @@ func TestCompiledFlow_RunsThresholdPipeline(t *testing.T) {
 	g := makeThresholdDebugGraph(t)
 	require.NoError(t, graph.Validate(g))
 
-	cf, err := Compile(g)
+	cf, err := Compile(uuid.New(), g, ingest.NewRouter())
 	require.NoError(t, err)
 	defer cf.Stop()
 
@@ -59,7 +61,7 @@ func TestCompiledFlow_RejectsMultipleOutgoingEdges(t *testing.T) {
 			{ID: "e2", Source: "a", Target: "c"},
 		},
 	}
-	_, err := CompileWithSinkWriter(g, &bytes.Buffer{})
+	_, err := CompileWithSinkWriter(uuid.New(), g, ingest.NewRouter(), &bytes.Buffer{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "multiple outgoing edges")
 }
@@ -77,7 +79,7 @@ func TestCompiledFlow_RejectsMultipleIncomingEdges(t *testing.T) {
 			{ID: "e2", Source: "b", Target: "c"},
 		},
 	}
-	_, err := CompileWithSinkWriter(g, &bytes.Buffer{})
+	_, err := CompileWithSinkWriter(uuid.New(), g, ingest.NewRouter(), &bytes.Buffer{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "multiple incoming edges")
 }
@@ -88,14 +90,14 @@ func TestCompiledFlow_BuildNodeErrorsOnUnknownType(t *testing.T) {
 			{ID: "x", Type: "not_a_real_type", Data: json.RawMessage(`{}`)},
 		},
 	}
-	_, err := CompileWithSinkWriter(g, &bytes.Buffer{})
+	_, err := CompileWithSinkWriter(uuid.New(), g, ingest.NewRouter(), &bytes.Buffer{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown node type")
 }
 
 func TestCompiledFlow_StartStopCleansUpGoroutines(t *testing.T) {
 	g := makeDebugSinkGraph(t)
-	cf, err := CompileWithSinkWriter(g, &bytes.Buffer{})
+	cf, err := CompileWithSinkWriter(uuid.New(), g, ingest.NewRouter(), &bytes.Buffer{})
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -118,7 +120,7 @@ func TestCompiledFlow_StartStopCleansUpGoroutines(t *testing.T) {
 
 func TestCompiledFlow_BusReturnsSameInstance(t *testing.T) {
 	g := makeDebugSinkGraph(t)
-	cf, err := CompileWithSinkWriter(g, &bytes.Buffer{})
+	cf, err := CompileWithSinkWriter(uuid.New(), g, ingest.NewRouter(), &bytes.Buffer{})
 	require.NoError(t, err)
 	defer cf.Stop()
 
@@ -129,7 +131,7 @@ func TestCompiledFlow_BusReturnsSameInstance(t *testing.T) {
 
 func TestCompiledFlow_StopWithoutStartIsNoOp(t *testing.T) {
 	g := makeDebugSinkGraph(t)
-	cf, err := CompileWithSinkWriter(g, &bytes.Buffer{})
+	cf, err := CompileWithSinkWriter(uuid.New(), g, ingest.NewRouter(), &bytes.Buffer{})
 	require.NoError(t, err)
 
 	// Stop before Start should not panic

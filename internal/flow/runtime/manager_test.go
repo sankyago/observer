@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sankyago/observer/internal/flow/graph"
+	"github.com/sankyago/observer/internal/ingest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +21,7 @@ func singleSinkGraph() graph.Graph {
 }
 
 func TestManager_StartReplaceStop(t *testing.T) {
-	mgr := NewManager()
+	mgr := NewManager(ingest.NewRouter())
 	id := uuid.New()
 	g := singleSinkGraph()
 
@@ -37,7 +38,7 @@ func TestManager_StartReplaceStop(t *testing.T) {
 }
 
 func TestManager_StartRegistersAndRunningReturnsTrue(t *testing.T) {
-	mgr := NewManager()
+	mgr := NewManager(ingest.NewRouter())
 	id := uuid.New()
 
 	require.NoError(t, mgr.Start(context.Background(), id, singleSinkGraph()))
@@ -47,7 +48,7 @@ func TestManager_StartRegistersAndRunningReturnsTrue(t *testing.T) {
 }
 
 func TestManager_StopUnregistersFlow(t *testing.T) {
-	mgr := NewManager()
+	mgr := NewManager(ingest.NewRouter())
 	id := uuid.New()
 
 	require.NoError(t, mgr.Start(context.Background(), id, singleSinkGraph()))
@@ -58,14 +59,14 @@ func TestManager_StopUnregistersFlow(t *testing.T) {
 }
 
 func TestManager_StopUnknownIDIsNoOp(t *testing.T) {
-	mgr := NewManager()
+	mgr := NewManager(ingest.NewRouter())
 	assert.NotPanics(t, func() {
 		mgr.Stop(uuid.New())
 	})
 }
 
 func TestManager_ReplaceStopsPreviousFlow(t *testing.T) {
-	mgr := NewManager()
+	mgr := NewManager(ingest.NewRouter())
 	id := uuid.New()
 	g := singleSinkGraph()
 
@@ -78,12 +79,12 @@ func TestManager_ReplaceStopsPreviousFlow(t *testing.T) {
 }
 
 func TestManager_BusReturnsNilForUnknownID(t *testing.T) {
-	mgr := NewManager()
+	mgr := NewManager(ingest.NewRouter())
 	assert.Nil(t, mgr.Bus(uuid.New()))
 }
 
 func TestManager_BusReturnsEventBusForRunningFlow(t *testing.T) {
-	mgr := NewManager()
+	mgr := NewManager(ingest.NewRouter())
 	id := uuid.New()
 
 	require.NoError(t, mgr.Start(context.Background(), id, singleSinkGraph()))
@@ -94,7 +95,7 @@ func TestManager_BusReturnsEventBusForRunningFlow(t *testing.T) {
 }
 
 func TestManager_StopAllClearsMapAndStopsFlows(t *testing.T) {
-	mgr := NewManager()
+	mgr := NewManager(ingest.NewRouter())
 	ids := make([]uuid.UUID, 3)
 	for i := range ids {
 		ids[i] = uuid.New()
@@ -124,7 +125,7 @@ func TestManager_StopAllClearsMapAndStopsFlows(t *testing.T) {
 }
 
 func TestManager_StartOnAlreadyRunningIDReplacesCleanly(t *testing.T) {
-	mgr := NewManager()
+	mgr := NewManager(ingest.NewRouter())
 	id := uuid.New()
 
 	require.NoError(t, mgr.Start(context.Background(), id, singleSinkGraph()))
@@ -141,7 +142,7 @@ func TestManager_StartOnAlreadyRunningIDReplacesCleanly(t *testing.T) {
 // not panic or race (run with -race).
 func TestManager_ConcurrentStartSameID(t *testing.T) {
 	const goroutines = 8
-	mgr := NewManager()
+	mgr := NewManager(ingest.NewRouter())
 	id := uuid.New()
 
 	var wg sync.WaitGroup

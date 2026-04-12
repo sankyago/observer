@@ -11,6 +11,7 @@ import (
 	"github.com/sankyago/observer/internal/flow/graph"
 	"github.com/sankyago/observer/internal/flow/runtime"
 	"github.com/sankyago/observer/internal/flow/store"
+	"github.com/sankyago/observer/internal/ingest"
 	"github.com/stretchr/testify/require"
 )
 
@@ -107,7 +108,7 @@ func invalidGraph() graph.Graph {
 
 func newTestService() (*Service, *fakeRepo, *runtime.Manager) {
 	repo := newFakeRepo()
-	mgr := runtime.NewManager()
+	mgr := runtime.NewManager(ingest.NewRouter())
 	ctx := context.Background()
 	svc := NewService(ctx, repo, mgr)
 	return svc, repo, mgr
