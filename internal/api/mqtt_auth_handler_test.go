@@ -194,6 +194,19 @@ func TestMQTTACL_MissingSecret(t *testing.T) {
 	assert.Equal(t, "deny", resultOf(t, rr))
 }
 
+// TestMQTTAuth_DeniesOneByteMismatch verifies that a secret differing by a
+// single byte is rejected (constant-time compare contract).
+func TestMQTTAuth_DeniesOneByteMismatch(t *testing.T) {
+	h, _ := newMQTTRouter(t, "secret", "observer-consumer")
+
+	body := `{"username":"observer-consumer","password":"","clientid":"x"}`
+	// "secreX" — last byte changed from 't' to 'X'
+	rr := postJSON(t, h, "/api/mqtt/auth", "secreX", body)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "deny", resultOf(t, rr))
+}
+
 // TestMQTTAuth_RoutesNotRegisteredWithoutOption verifies that if WithMQTTAuth
 // is not passed the endpoints are not registered (404).
 func TestMQTTAuth_RoutesNotRegisteredWithoutOption(t *testing.T) {

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -39,7 +40,11 @@ func newMQTTAuthHandler(svc *devices.Service, secret, serviceUser string) *mqttA
 }
 
 func (h *mqttAuthHandler) checkSecret(r *http.Request) bool {
-	return h.secret != "" && r.Header.Get("X-EMQX-Secret") == h.secret
+	if h.secret == "" {
+		return false
+	}
+	got := r.Header.Get("X-EMQX-Secret")
+	return subtle.ConstantTimeCompare([]byte(got), []byte(h.secret)) == 1
 }
 
 type authReq struct {
