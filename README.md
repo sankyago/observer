@@ -18,7 +18,9 @@ Three goroutines connected by channels in a single binary:
 
 The alert path runs in-memory (sub-millisecond); the DB path is decoupled and batched.
 
-## Quick Start
+## Running
+
+### Docker (full stack)
 
 ```bash
 docker compose up -d            # start EMQX + Postgres

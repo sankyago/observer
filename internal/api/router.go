@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sankyago/observer/internal/devices"
 	"github.com/sankyago/observer/internal/flow"
+	"github.com/sankyago/observer/internal/web"
 )
 
 // RouterOption configures optional behaviour of NewRouter.
