@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sankyago/observer/internal/flow"
+	"github.com/sankyago/observer/internal/web"
 )
 
 func NewRouter(svc *flow.Service) http.Handler {
@@ -24,6 +25,7 @@ func NewRouter(svc *flow.Service) http.Handler {
 			r.Get("/{id}/events", h.events)
 		})
 	}
+	r.Handle("/*", web.Handler())
 	return r
 }
 
