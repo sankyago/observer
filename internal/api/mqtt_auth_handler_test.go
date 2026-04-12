@@ -230,6 +230,28 @@ func TestMQTTAuth_CacheInvalidatedOnRotate(t *testing.T) {
 	assert.Equal(t, "deny", resultOf(t, rr))
 }
 
+// TestInvalidate_ClearsCache verifies that calling Invalidate on a token that
+// is currently cached causes the next lookup to fall back to the DB (fakeRepo).
+func TestInvalidate_ClearsCache(t *testing.T) {
+	h, svc, mqttH := newMQTTRouterWithInvalidation(t, "secret", "observer-consumer")
+	ctx := context.Background()
+
+	d, err := svc.Create(ctx, "dev")
+	require.NoError(t, err)
+
+	// Populate cache.
+	body := fmt.Sprintf(`{"username":%q,"password":"","clientid":"x"}`, d.Token)
+	rr := postJSON(t, h, "/api/mqtt/auth", "secret", body)
+	require.Equal(t, "allow", resultOf(t, rr))
+
+	// Directly invalidate the token.
+	mqttH.Invalidate(d.Token)
+
+	// Next auth still allows (device still exists in fakeRepo, re-fetched from DB).
+	rr = postJSON(t, h, "/api/mqtt/auth", "secret", body)
+	assert.Equal(t, "allow", resultOf(t, rr))
+}
+
 // TestMQTTAuth_DeniesOneByteMismatch verifies that a secret differing by a
 // single byte is rejected (constant-time compare contract).
 func TestMQTTAuth_DeniesOneByteMismatch(t *testing.T) {
