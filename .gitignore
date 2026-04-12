@@ -1,1 +1,4 @@
 /observer
+ui/node_modules/
+ui/dist/
+internal/web/dist/
