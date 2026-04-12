@@ -34,4 +34,7 @@ func TestMigrate_RunsAllFiles(t *testing.T) {
 	err = pool.QueryRow(ctx, "SELECT count(*) FROM flows").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
+
+	// Second run must be idempotent — all DDL uses IF NOT EXISTS.
+	require.NoError(t, Migrate(ctx, pool, "../../migrations"), "second Migrate must not error")
 }
