@@ -72,7 +72,7 @@ func TestE2E_FlowApiMQTTToWS(t *testing.T) {
 	repo := store.NewRepo(pool)
 	mgr := flowruntime.NewManager()
 	svc := flow.NewService(ctx, repo, mgr)
-	srv := httptest.NewServer(api.NewRouter(svc))
+	srv := httptest.NewServer(api.NewRouter(svc, nil))
 	t.Cleanup(srv.Close)
 	t.Cleanup(mgr.StopAll)
 

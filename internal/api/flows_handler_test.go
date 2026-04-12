@@ -131,7 +131,7 @@ func do(t *testing.T, svc *flow.Service, method, path, body string) *httptest.Re
 		req.Header.Set("Content-Type", "application/json")
 	}
 	rr := httptest.NewRecorder()
-	NewRouter(svc).ServeHTTP(rr, req)
+	NewRouter(svc, nil).ServeHTTP(rr, req)
 	return rr
 }
 

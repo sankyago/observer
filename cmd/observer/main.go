@@ -45,7 +45,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:         addr,
-		Handler:      api.NewRouter(svc),
+		Handler:      api.NewRouter(svc, nil),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 0, // WS needs no write timeout
 	}

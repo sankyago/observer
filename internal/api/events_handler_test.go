@@ -38,7 +38,7 @@ func newEnabledFlowService(t *testing.T) (*flow.Service, uuid.UUID) {
 // returns 101 Switching Protocols for a running flow.
 func TestEventsWS_Upgrades(t *testing.T) {
 	svc, id := newEnabledFlowService(t)
-	srv := httptest.NewServer(NewRouter(svc))
+	srv := httptest.NewServer(NewRouter(svc, nil))
 	t.Cleanup(srv.Close)
 
 	wsURL := "ws" + srv.URL[len("http"):] + "/api/flows/" + id.String() + "/events"
@@ -52,7 +52,7 @@ func TestEventsWS_Upgrades(t *testing.T) {
 // calling bus.Publish sends the JSON-encoded event to the WS client.
 func TestEventsWS_ReceivesPublishedEvent(t *testing.T) {
 	svc, id := newEnabledFlowService(t)
-	srv := httptest.NewServer(NewRouter(svc))
+	srv := httptest.NewServer(NewRouter(svc, nil))
 	t.Cleanup(srv.Close)
 
 	wsURL := "ws" + srv.URL[len("http"):] + "/api/flows/" + id.String() + "/events"
@@ -89,7 +89,7 @@ func TestEventsWS_ReceivesPublishedEvent(t *testing.T) {
 // returns 404 (flow not running).
 func TestEventsWS_BogusID(t *testing.T) {
 	svc, _ := newEnabledFlowService(t)
-	srv := httptest.NewServer(NewRouter(svc))
+	srv := httptest.NewServer(NewRouter(svc, nil))
 	t.Cleanup(srv.Close)
 
 	bogus := uuid.New().String()
@@ -103,7 +103,7 @@ func TestEventsWS_BogusID(t *testing.T) {
 // returns 400.
 func TestEventsWS_InvalidUUID(t *testing.T) {
 	svc, _ := newEnabledFlowService(t)
-	srv := httptest.NewServer(NewRouter(svc))
+	srv := httptest.NewServer(NewRouter(svc, nil))
 	t.Cleanup(srv.Close)
 
 	wsURL := "ws" + srv.URL[len("http"):] + "/api/flows/not-a-uuid/events"
@@ -116,7 +116,7 @@ func TestEventsWS_InvalidUUID(t *testing.T) {
 // removes the subscription from the EventBus.
 func TestEventsWS_UnsubscribesOnDisconnect(t *testing.T) {
 	svc, id := newEnabledFlowService(t)
-	srv := httptest.NewServer(NewRouter(svc))
+	srv := httptest.NewServer(NewRouter(svc, nil))
 	t.Cleanup(srv.Close)
 
 	bus := svc.Manager().Bus(id)
