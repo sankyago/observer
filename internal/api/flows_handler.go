@@ -58,7 +58,11 @@ func (h *flowsHandler) create(w http.ResponseWriter, r *http.Request) {
 	}
 	f, err := h.svc.Create(r.Context(), req.Name, req.Graph, req.Enabled)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
+		if errors.Is(err, graph.ErrValidation) {
+			writeErr(w, http.StatusBadRequest, err.Error())
+		} else {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 	writeJSON(w, http.StatusCreated, toDTO(f))
@@ -105,7 +109,11 @@ func (h *flowsHandler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
+		if errors.Is(err, graph.ErrValidation) {
+			writeErr(w, http.StatusBadRequest, err.Error())
+		} else {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 	writeJSON(w, http.StatusOK, toDTO(f))

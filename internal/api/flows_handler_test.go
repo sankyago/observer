@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -328,3 +329,59 @@ func ptrStr(s string) *string { return &s }
 
 // Ensure the bytes import is used (the plan stub imported it; we keep it via buffer).
 var _ = bytes.NewBuffer
+
+// errRepo wraps fakeRepo and forces Create/Update to return a sentinel error.
+type errRepo struct {
+	*fakeRepo
+	createErr error
+	updateErr error
+}
+
+func (r *errRepo) Create(ctx context.Context, f *store.Flow) error {
+	if r.createErr != nil {
+		return r.createErr
+	}
+	return r.fakeRepo.Create(ctx, f)
+}
+
+func (r *errRepo) Update(ctx context.Context, f *store.Flow) error {
+	if r.updateErr != nil {
+		return r.updateErr
+	}
+	return r.fakeRepo.Update(ctx, f)
+}
+
+var errDB = errors.New("db unavailable")
+
+// TestCreateFlow_RepoError_Returns500 verifies that an infrastructure error from
+// the repo maps to 500, not 400.
+func TestCreateFlow_RepoError_Returns500(t *testing.T) {
+	repo := &errRepo{fakeRepo: newFakeRepo(), createErr: errDB}
+	mgr := runtime.NewManager()
+	svc := flow.NewService(context.Background(), repo, mgr)
+
+	body, _ := json.Marshal(map[string]any{"name": "x", "graph": debugOnlyGraph()})
+	rr := do(t, svc, http.MethodPost, "/api/flows", string(body))
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+// TestUpdateFlow_RepoError_Returns500 verifies that an infrastructure error from
+// the repo on Update maps to 500, not 400.
+func TestUpdateFlow_RepoError_Returns500(t *testing.T) {
+	inner := newFakeRepo()
+	repo := &errRepo{fakeRepo: inner}
+	mgr := runtime.NewManager()
+	svc := flow.NewService(context.Background(), repo, mgr)
+
+	// Create a flow first using the underlying repo directly.
+	ctx := context.Background()
+	f := &store.Flow{Name: "orig", Graph: debugOnlyGraph()}
+	require.NoError(t, inner.Create(ctx, f))
+
+	// Now force Update to fail.
+	repo.updateErr = errDB
+
+	body, _ := json.Marshal(map[string]any{"name": ptrStr("new-name")})
+	rr := do(t, svc, http.MethodPut, "/api/flows/"+f.ID.String(), string(body))
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}

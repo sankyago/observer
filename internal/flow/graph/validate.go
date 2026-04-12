@@ -2,8 +2,14 @@ package graph
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 )
+
+// ErrValidation is the sentinel wrapped by all Validate errors.
+// Handlers check errors.Is(err, ErrValidation) to distinguish validation
+// failures (→ 400) from infrastructure errors (→ 500).
+var ErrValidation = errors.New("validation failed")
 
 var KnownTypes = map[string]func(json.RawMessage) error{
 	"mqtt_source":    validateMQTTSource,
@@ -16,29 +22,32 @@ func Validate(g Graph) error {
 	ids := make(map[string]struct{}, len(g.Nodes))
 	for _, n := range g.Nodes {
 		if n.ID == "" {
-			return fmt.Errorf("node has empty id")
+			return fmt.Errorf("%w: node has empty id", ErrValidation)
 		}
 		if _, dup := ids[n.ID]; dup {
-			return fmt.Errorf("duplicate node id %q", n.ID)
+			return fmt.Errorf("%w: duplicate node id %q", ErrValidation, n.ID)
 		}
 		ids[n.ID] = struct{}{}
 		v, ok := KnownTypes[n.Type]
 		if !ok {
-			return fmt.Errorf("unknown node type %q on node %q", n.Type, n.ID)
+			return fmt.Errorf("%w: unknown node type %q on node %q", ErrValidation, n.Type, n.ID)
 		}
 		if err := v(n.Data); err != nil {
-			return fmt.Errorf("node %q: %w", n.ID, err)
+			return fmt.Errorf("%w: node %q: %v", ErrValidation, n.ID, err)
 		}
 	}
 	for _, e := range g.Edges {
 		if _, ok := ids[e.Source]; !ok {
-			return fmt.Errorf("edge %s: source %q not found", e.ID, e.Source)
+			return fmt.Errorf("%w: edge %s: source %q not found", ErrValidation, e.ID, e.Source)
 		}
 		if _, ok := ids[e.Target]; !ok {
-			return fmt.Errorf("edge %s: target %q not found", e.ID, e.Target)
+			return fmt.Errorf("%w: edge %s: target %q not found", ErrValidation, e.ID, e.Target)
 		}
 	}
-	return detectCycle(g)
+	if err := detectCycle(g); err != nil {
+		return fmt.Errorf("%w: %v", ErrValidation, err)
+	}
+	return nil
 }
 
 func detectCycle(g Graph) error {

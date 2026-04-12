@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -33,11 +34,14 @@ func serveEvents(svc *flow.Service, w http.ResponseWriter, r *http.Request) {
 
 	sub := bus.Subscribe(64)
 	defer bus.Unsubscribe(sub)
-	ctx := r.Context()
+
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 
 	go func() {
 		for {
 			if _, _, err := conn.ReadMessage(); err != nil {
+				cancel()
 				return
 			}
 		}
