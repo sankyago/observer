@@ -18,13 +18,34 @@ Three goroutines connected by channels in a single binary:
 
 The alert path runs in-memory (sub-millisecond); the DB path is decoupled and batched.
 
-## Quick Start
+## Running
+
+### Docker (full stack)
 
 ```bash
-docker compose up -d            # start Mosquitto + Postgres
-go build ./cmd/observer/
-./observer                      # listens on :8080
+docker compose up --build
 ```
+
+Then open http://localhost:8080. The React UI lets you create flows, drag nodes onto the canvas, connect them with edges, configure each node, save, and stream live events over WebSocket.
+
+### Local development
+
+Two terminals:
+
+```bash
+# terminal 1 — API + Postgres + Mosquitto
+docker compose up timescaledb mosquitto -d
+go run ./cmd/observer     # :8080
+
+# terminal 2 — UI with hot reload
+cd ui
+npm install
+npm run dev               # :5173 (proxies /api and WebSockets to :8080)
+```
+
+Open http://localhost:5173.
+
+## Quick Start
 
 Create a flow:
 
