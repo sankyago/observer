@@ -21,7 +21,6 @@ In:
 - Observer connects to EMQX as a shared-subscription consumer on startup and forwards parsed readings into an in-process ingest channel.
 - `internal/ingest/` package: EMQX client, parser, router.
 - New flow node `device_source` replaces `mqtt_source`. Selector shape: `{device_id?: string, all?: bool}`.
-- Prometheus `/metrics` endpoint (power-plant-grade: "you cannot scale what you cannot measure").
 - Removal of `mqtt_source` node and `internal/subscriber/` (code moves to `internal/ingest/` where still useful).
 
 Out (explicit deferrals):
@@ -31,6 +30,7 @@ Out (explicit deferrals):
 - Sticky shared-subscription routing and per-device flow-state partitioning (single-replica for now).
 - MQTT 5 features beyond what the default EMQX/paho configuration gives us.
 - Redis or external state for flow windows/cooldowns. Single-replica assumption holds.
+- Prometheus `/metrics` endpoint. Observability added in a later PR once the core is shipping.
 - UI changes. Follow-up PR rebases the UI onto this branch (changes `mqtt_source` → `device_source` in palette, adds devices page).
 
 ## Architecture
@@ -72,11 +72,11 @@ Device ─── MQTT ────► │  :1883 (mqtt), :8083 (ws)   │
 
 **Units and responsibilities:**
 
-- `internal/ingest/mqtt_consumer.go` — connects to EMQX, subscribes to `$share/observer/v1/devices/+/telemetry`, forwards raw messages into the parser. Auto-reconnect. Metrics on receive.
-- `internal/ingest/parser.go` — pure function `parse(topic, payload) → []model.SensorReading`. No I/O, fully unit-testable.
-- `internal/ingest/router.go` — receives parsed readings, fans out to subscribed flows. Looks up device by token → resolves to device ID. Holds the registry of "which running flows want readings from which devices."
+- `internal/ingest/mqtt_consumer.go` — connects to EMQX, subscribes to `$share/observer/v1/devices/+/telemetry`, forwards raw messages into the parser. Auto-reconnect.
+- `internal/ingest/parser.go` — pure function `parse(topic, payload) → []model.SensorReading`. Extracts the device UUID directly from the topic (`v1/devices/{uuid}/telemetry`). No I/O, fully unit-testable.
+- `internal/ingest/router.go` — receives parsed readings, fans out to subscribed flows. Holds the registry of "which running flows want readings from which devices."
 - `internal/devices/service.go` + `store/repo.go` — pgx-backed CRUD, token generation (`crypto/rand`, base64url, 20 bytes).
-- `internal/api/mqtt_auth_handler.go` — EMQX webhook endpoints. Validates tokens, returns `allow`/`deny`. Enforces ACL: a device may only publish to `v1/devices/me/telemetry` (EMQX rewrites `me` using the authenticated username).
+- `internal/api/mqtt_auth_handler.go` — EMQX webhook endpoints. Validates tokens, returns `allow`/`deny`. Enforces ACL: a device may only publish to its own `devices/{its-uuid}/telemetry`.
 - `internal/api/devices_handler.go` — REST CRUD for devices.
 
 ## Data Model
@@ -133,22 +133,24 @@ Logic:
 
 Request:
 ```json
-{ "username": "U123...", "action": "publish", "topic": "v1/devices/me/telemetry" }
+{ "username": "U123...", "action": "publish", "topic": "devices/d52a8f7e-.../telemetry" }
 ```
 
 Response: `{"result": "allow"}` if:
-- `action == "publish"` AND `topic == "v1/devices/me/telemetry"` AND username matches an existing device token.
+- `action == "publish"` AND `topic == "v1/devices/{uuid}/telemetry"` AND `{uuid}` matches the device whose token equals `username`.
 - `action == "subscribe"` AND username is the Observer service account.
 
 Everything else: `deny`.
+
+The ACL handler keeps a 30-second in-memory cache of `token → device UUID` so this hot path does not hit the DB on every publish.
 
 Both endpoints are mounted under `/api/mqtt/*` but do NOT require the JSON payload wrapping the UI uses. They're shaped for EMQX. A shared-secret header (`X-EMQX-Secret`) env-configurable protects them from random callers on the same network.
 
 ## MQTT Topic + Payload Contract
 
-**Topic (device publishes):** `v1/devices/me/telemetry`
+**Topic (device publishes):** `devices/{device-uuid}/telemetry`
 
-EMQX substitutes `me` with the authenticated username (device token) before routing. So the concrete topic that Observer sees via its shared subscription is `v1/devices/{token}/telemetry`.
+The device knows its own UUID (returned when it was created via the REST API, alongside the token). The token authenticates the CONNECT; the UUID in the topic identifies which device the message is for. The ACL layer enforces that a device may only publish to the topic matching its own UUID.
 
 **Payload:** JSON object, keys are metric names, values are numbers. Optional `ts` top-level ISO-8601 timestamp; if absent, server uses receive time.
 
@@ -187,41 +189,17 @@ EMQX ─► consumer ─► parser ─► router ─► flow input channels
 1. `consumer.Run(ctx)`:
    - Connects to `EMQX_BROKER_URL` with service-account credentials.
    - Subscribes to `$share/observer/v1/devices/+/telemetry`.
-   - On each message: increments `observer_messages_received_total`, sends to parser input channel.
+   - On each message: sends to parser input channel.
 2. `parser`:
-   - Pure function. Extracts token from topic, parses JSON, yields `[]SensorReading{DeviceID: deviceID-from-token-lookup, Metric, Value, Timestamp}`.
-   - The token→deviceID lookup uses an in-memory cache of the `devices` table with a 30-second TTL. The cache is populated lazily and refreshed on miss. Deleting a device invalidates the cache entry.
+   - Pure function. Extracts the UUID from the topic (`v1/devices/{uuid}/telemetry`), parses JSON, yields `[]SensorReading{DeviceID, Metric, Value, Timestamp}`.
+   - No DB lookup in the hot path — the UUID is directly in the topic, trust the ACL layer's earlier check.
+   - Malformed topics or payloads are dropped; a parse-error is logged at debug.
    - Parser output goes to router.
 3. `router`:
    - Holds `subscriptions map[flowID][]Subscription` and `reverse index map[(deviceID,metric)][]*Subscription`.
    - On reading: looks up matching subscriptions, pushes to each one's output channel (non-blocking, drop-on-full with a counter).
    - `Subscribe(flowID, deviceSel, metricSel) → chan Reading`.
    - `Unsubscribe(flowID)` — wipes all subs for that flow.
-
-## Observability
-
-`github.com/prometheus/client_golang` added. New `/metrics` endpoint mounted on the API router.
-
-**Counters:**
-- `observer_messages_received_total`
-- `observer_readings_parsed_total`
-- `observer_parse_errors_total{reason}`
-- `observer_router_drops_total{flow_id}`
-- `observer_flow_events_total{kind}`
-- `observer_bus_drops_total`
-- `observer_mqtt_auth_allow_total`
-- `observer_mqtt_auth_deny_total{reason}`
-
-**Gauges:**
-- `observer_ingest_channel_depth`
-- `observer_flows_running`
-- `observer_devices_total`
-- `observer_ws_subscribers`
-
-**Histogram:**
-- `observer_message_processing_seconds` — from `consumer.handler entry` to `router.dispatch return`.
-
-No Grafana dashboards shipped in this PR (add follow-up). Just the endpoint and clean metric names.
 
 ## Configuration
 
@@ -241,9 +219,9 @@ Existing `MQTT_BROKER` / `MQTT_TOPIC` env vars are removed.
 
 - **Device token invalid on CONNECT** → `/api/mqtt/auth` returns `deny`, counter increments, EMQX closes socket. No server-side log spam (log at debug).
 - **Device publishes to wrong topic** → `/api/mqtt/acl` returns `deny`.
-- **Message parse failure** → `parse_errors_total{reason}` increments, message is dropped. Reason labels: `bad_json`, `no_numeric_values`, `unknown_token`.
-- **Router output channel full** → `router_drops_total{flow_id}` increments, reading dropped (do not block the ingest path).
-- **EMQX consumer disconnect** → paho auto-reconnects. A `mqtt_consumer_reconnects_total` counter tracks churn.
+- **Message parse failure** → logged at debug, message dropped. Failure modes: bad JSON, no numeric values, topic that does not match `v1/devices/{uuid}/telemetry`.
+- **Router output channel full** → reading dropped (do not block the ingest path). Logged at debug.
+- **EMQX consumer disconnect** → paho auto-reconnects.
 - **Observer HTTP handler down** → EMQX default `super-user`/`deny` semantics depend on configuration. We configure EMQX to **deny by default on webhook failure** so a dead Observer means no new device connections (safer than allowing).
 - **Database down** → `/api/mqtt/auth` returns 500; EMQX denies. Devices queue locally and reconnect when we recover.
 
@@ -265,8 +243,6 @@ Power-plant bar applies. Every function in `internal/ingest/`, `internal/devices
 - `devices.Service.RegenerateToken` — new token differs, old token cache invalidated.
 - `mqtt_auth_handler` — allow valid token, deny unknown, allow service account, reject missing secret.
 - `acl_handler` — allow publish to `me/telemetry`, deny wrong topic, allow service-account subscribe.
-- Metrics collector hooks — increment counters on expected paths (probe via prometheus's test registry).
-
 **Integration (`//go:build integration`):**
 - `devices/store/repo_test.go` — CRUD against ephemeral Timescale container.
 - `ingest/integration_test.go` — spin up EMQX container + Postgres, register a device via API, publish from a paho client using the token, assert the reading flows out of the router into a subscribed flow.
