@@ -32,6 +32,7 @@ func serveEvents(svc *flow.Service, w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	sub := bus.Subscribe(64)
+	defer bus.Unsubscribe(sub)
 	ctx := r.Context()
 
 	go func() {

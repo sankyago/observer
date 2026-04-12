@@ -111,3 +111,32 @@ func TestEventsWS_InvalidUUID(t *testing.T) {
 	require.Error(t, err, "expected upgrade failure")
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
+
+// TestEventsWS_UnsubscribesOnDisconnect verifies that closing the WS connection
+// removes the subscription from the EventBus.
+func TestEventsWS_UnsubscribesOnDisconnect(t *testing.T) {
+	svc, id := newEnabledFlowService(t)
+	srv := httptest.NewServer(NewRouter(svc))
+	t.Cleanup(srv.Close)
+
+	bus := svc.Manager().Bus(id)
+	require.NotNil(t, bus)
+
+	before := bus.SubscriberCount()
+
+	wsURL := "ws" + srv.URL[len("http"):] + "/api/flows/" + id.String() + "/events"
+	conn, _, err := wsDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+
+	// Wait for the subscription to be registered.
+	require.Eventually(t, func() bool {
+		return bus.SubscriberCount() > before
+	}, time.Second, 5*time.Millisecond, "subscription never registered")
+
+	// Close the connection and wait for the server-side handler to unsubscribe.
+	conn.Close()
+
+	require.Eventually(t, func() bool {
+		return bus.SubscriberCount() == before
+	}, 2*time.Second, 10*time.Millisecond, "subscription not removed after disconnect")
+}

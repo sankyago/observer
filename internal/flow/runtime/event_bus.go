@@ -52,6 +52,12 @@ func (b *EventBus) Publish(e nodes.FlowEvent) {
 	}
 }
 
+func (b *EventBus) SubscriberCount() int {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return len(b.subs)
+}
+
 func (b *EventBus) Close() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
