@@ -18,7 +18,7 @@ func mustRaw(t *testing.T, v any) json.RawMessage {
 func TestValidate_OK(t *testing.T) {
 	g := Graph{
 		Nodes: []Node{
-			{ID: "a", Type: "mqtt_source", Data: mustRaw(t, map[string]any{"broker": "tcp://x:1", "topic": "sensors/#"})},
+			{ID: "a", Type: "device_source", Data: mustRaw(t, map[string]any{"device_id": "550e8400-e29b-41d4-a716-446655440000"})},
 			{ID: "b", Type: "threshold", Data: mustRaw(t, map[string]any{"min": 0.0, "max": 1.0})},
 			{ID: "c", Type: "debug_sink", Data: mustRaw(t, map[string]any{})},
 		},

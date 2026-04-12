@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/google/uuid"
 )
 
 // ErrValidation is the sentinel wrapped by all Validate errors.
@@ -12,7 +14,7 @@ import (
 var ErrValidation = errors.New("validation failed")
 
 var KnownTypes = map[string]func(json.RawMessage) error{
-	"mqtt_source":    validateMQTTSource,
+	"device_source":  validateDeviceSource,
 	"threshold":      validateThreshold,
 	"rate_of_change": validateRateOfChange,
 	"debug_sink":     validateDebugSink,
@@ -116,23 +118,23 @@ func validateRateOfChange(raw json.RawMessage) error {
 	return nil
 }
 
-type mqttSourceCfg struct {
-	Broker   string `json:"broker"`
-	Topic    string `json:"topic"`
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
+type deviceSourceCfg struct {
+	DeviceID string `json:"device_id"`
+	Metric   string `json:"metric"`
 }
 
-func validateMQTTSource(raw json.RawMessage) error {
-	var c mqttSourceCfg
+func validateDeviceSource(raw json.RawMessage) error {
+	if len(raw) == 0 {
+		return nil
+	}
+	var c deviceSourceCfg
 	if err := json.Unmarshal(raw, &c); err != nil {
-		return fmt.Errorf("mqtt_source data: %w", err)
+		return fmt.Errorf("%w: device_source data: %v", ErrValidation, err)
 	}
-	if c.Broker == "" {
-		return fmt.Errorf("mqtt_source: broker required")
-	}
-	if c.Topic == "" {
-		return fmt.Errorf("mqtt_source: topic required")
+	if c.DeviceID != "" {
+		if _, err := uuid.Parse(c.DeviceID); err != nil {
+			return fmt.Errorf("%w: device_source: device_id must be uuid", ErrValidation)
+		}
 	}
 	return nil
 }
