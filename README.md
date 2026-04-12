@@ -21,44 +21,58 @@ The alert path runs in-memory (sub-millisecond); the DB path is decoupled and ba
 ## Quick Start
 
 ```bash
-docker compose up -d           # start Mosquitto + TimescaleDB
-go build ./cmd/observer/       # build binary
-./observer                     # run
+docker compose up -d            # start Mosquitto + Postgres
+go build ./cmd/observer/
+./observer                      # listens on :8080
 ```
 
-Publish a test message:
+Create a flow:
 
 ```bash
-mosquitto_pub -h localhost -t sensors/machine-42/temperature \
-  -m '{"value": 96.2, "timestamp": "2026-04-12T10:00:01Z"}'
+curl -X POST localhost:8080/api/flows -H 'content-type: application/json' -d '{
+  "name": "demo",
+  "enabled": true,
+  "graph": {
+    "nodes": [
+      {"id":"src","type":"mqtt_source","position":{"x":0,"y":0},"data":{"broker":"tcp://localhost:1883","topic":"sensors/#"}},
+      {"id":"th","type":"threshold","position":{"x":200,"y":0},"data":{"min":0,"max":80}},
+      {"id":"sink","type":"debug_sink","position":{"x":400,"y":0},"data":{}}
+    ],
+    "edges": [
+      {"id":"e1","source":"src","target":"th"},
+      {"id":"e2","source":"th","target":"sink"}
+    ]
+  }
+}'
 ```
 
-You should see:
+Stream its events: `websocat ws://localhost:8080/api/flows/<id>/events`.
 
-```
-[ALERT] 2026-04-12T10:00:01Z | machine-42 | temperature | THRESHOLD | value=96.2 (max=80)
-```
+## API
 
-## MQTT Format
+| Method | Path                       |
+|--------|----------------------------|
+| GET    | /api/health                |
+| GET    | /api/flows                 |
+| POST   | /api/flows                 |
+| GET    | /api/flows/:id             |
+| PUT    | /api/flows/:id             |
+| DELETE | /api/flows/:id             |
+| GET    | /api/flows/:id/events (WS) |
 
-- Topic: `sensors/{device_id}/{metric}`
-- Payload: `{"value": <float>, "timestamp": "<RFC3339>"}`
+## Node Types
 
-Default rules (per metric):
-
-| Metric      | Min    | Max    | Max rate/sec |
-|-------------|--------|--------|--------------|
-| temperature | -20.0  | 80.0   | 2.0          |
-| humidity    | 10.0   | 90.0   | 5.0          |
-| pressure    | 950.0  | 1050.0 | 10.0         |
+- `mqtt_source` — `{broker, topic, username?, password?}`
+- `threshold` — `{min, max}`
+- `rate_of_change` — `{max_per_second, window_size}`
+- `debug_sink` — `{}`
 
 ## Configuration
 
-| Variable        | Default                                                |
-|-----------------|--------------------------------------------------------|
-| `MQTT_BROKER`   | `tcp://localhost:1883`                                 |
-| `MQTT_TOPIC`    | `sensors/#`                                            |
-| `DATABASE_URL`  | `postgres://observer:observer@localhost:5432/observer` |
+| Variable       | Default                                                |
+|----------------|--------------------------------------------------------|
+| `HTTP_ADDR`    | `:8080`                                                |
+| `DATABASE_URL` | `postgres://observer:observer@localhost:5432/observer` |
 
 ## Testing
 

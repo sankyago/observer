@@ -4,12 +4,19 @@ Real-time MQTT alert system in Go. Subscribes to sensor data, detects anomalies,
 
 ## Project Structure
 
-- `cmd/observer/` — main entrypoint
-- `internal/subscriber/` — MQTT client, topic parsing, JSON decoding
-- `internal/engine/` — alert engine (threshold + rate-of-change detection)
-- `internal/flusher/` — batched aggregation and bulk writes to TimescaleDB
+- `cmd/observer/` — API server entrypoint
+- `internal/api/` — HTTP + WebSocket handlers (chi + gorilla)
+- `internal/flow/` — flow service, graph types/validation, nodes, runtime, store
+  - `graph/` — JSON types, validation, cycle detection
+  - `nodes/` — node implementations (`mqtt_source`, `threshold`, `rate_of_change`, `debug_sink`)
+  - `runtime/` — `CompiledFlow`, `FlowManager`, `EventBus`
+  - `store/` — `FlowRepo` (pgx)
+- `internal/db/` — migration runner
+- `internal/subscriber/` — MQTT parsing helpers (reused by `mqtt_source`)
+- `internal/engine/` — threshold/rate rules + sliding window (reused by nodes)
+- `internal/flusher/` — aggregation + TimescaleDB writer (currently unwired; reserved for `timescale_sink`)
 - `internal/model/` — shared data types
-- `migrations/` — SQL migrations
+- `migrations/` — SQL migrations (run on startup)
 - `test/` — end-to-end tests
 
 ## Commands
