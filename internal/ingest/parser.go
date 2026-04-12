@@ -32,11 +32,15 @@ func Parse(topic string, payload []byte, now func() time.Time) ([]model.SensorRe
 
 	ts := now()
 	if tv, ok := raw[timestampKey]; ok {
-		if s, ok := tv.(string); ok {
-			if t, err := time.Parse(time.RFC3339, s); err == nil {
-				ts = t
-			}
+		s, isStr := tv.(string)
+		if !isStr {
+			return nil, fmt.Errorf("ts: expected RFC3339 string, got %T", tv)
 		}
+		t, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			return nil, fmt.Errorf("ts: %w", err)
+		}
+		ts = t
 	}
 
 	readings := make([]model.SensorReading, 0, len(raw))
