@@ -133,11 +133,24 @@ func TestMQTTACL_DeniesDevicePublishingOtherTopic(t *testing.T) {
 }
 
 // TestMQTTACL_AllowsServiceAccountSubscribe verifies that the service account
-// may subscribe to shared topics.
+// may subscribe to shared topics (full $share/ form).
 func TestMQTTACL_AllowsServiceAccountSubscribe(t *testing.T) {
 	h, _ := newMQTTRouter(t, "secret", "observer-consumer")
 
 	body := `{"username":"observer-consumer","action":"subscribe","topic":"$share/observer/v1/devices/+/telemetry"}`
+	rr := postJSON(t, h, "/api/mqtt/acl", "secret", body)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "allow", resultOf(t, rr))
+}
+
+// TestMQTTACL_AllowsServiceAccountSubscribeBareTopic verifies that the service
+// account may subscribe when EMQX strips the "$share/{group}/" prefix before
+// calling the ACL hook (EMQX 5.7 behaviour).
+func TestMQTTACL_AllowsServiceAccountSubscribeBareTopic(t *testing.T) {
+	h, _ := newMQTTRouter(t, "secret", "observer-consumer")
+
+	body := `{"username":"observer-consumer","action":"subscribe","topic":"v1/devices/+/telemetry"}`
 	rr := postJSON(t, h, "/api/mqtt/acl", "secret", body)
 
 	require.Equal(t, http.StatusOK, rr.Code)

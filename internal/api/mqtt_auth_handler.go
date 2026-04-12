@@ -88,9 +88,13 @@ func (h *mqttAuthHandler) acl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Service account: allow subscribe only to the shared consumer topic.
+	// Service account: allow subscribe to the telemetry wildcard topic.
+	// EMQX strips the "$share/{group}/" prefix before calling the ACL hook, so
+	// we must accept the bare topic (e.g. "v1/devices/+/telemetry") as well as
+	// the full shared-subscription form (e.g. "$share/observer/v1/devices/+/telemetry").
 	if req.Username == h.serviceUser {
-		if req.Action == "subscribe" && strings.HasPrefix(req.Topic, "$share/") {
+		if req.Action == "subscribe" &&
+			(strings.HasPrefix(req.Topic, "$share/") || strings.HasPrefix(req.Topic, "v1/devices/")) {
 			writeJSON(w, http.StatusOK, map[string]string{"result": "allow"})
 			return
 		}
