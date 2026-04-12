@@ -15,6 +15,7 @@ type RouterOption func(*routerConfig)
 type routerConfig struct {
 	mqttSecret      string
 	mqttServiceUser string
+	mqttHandler     *mqttAuthHandler
 }
 
 // WithMQTTAuth enables the /api/mqtt/auth and /api/mqtt/acl endpoints.
@@ -26,6 +27,31 @@ func WithMQTTAuth(secret, serviceUser string) RouterOption {
 		c.mqttServiceUser = serviceUser
 	}
 }
+
+// WithMQTTAuthHandler registers a pre-built mqttAuthHandler for the MQTT
+// auth/ACL endpoints. Use this when you need a reference to the handler before
+// building the router (e.g. to wire its Invalidate method into devices.Service).
+func WithMQTTAuthHandler(h *MQTTAuthHandler) RouterOption {
+	return func(c *routerConfig) { c.mqttHandler = h.inner }
+}
+
+// MQTTAuthHandler is an exported wrapper around the internal mqttAuthHandler
+// that lets callers access the Invalidate method for cache wiring.
+type MQTTAuthHandler struct{ inner *mqttAuthHandler }
+
+// NewMQTTAuthHandler constructs an MQTTAuthHandler that can be passed to
+// WithMQTTAuthHandler and whose Invalidate method can be wired into
+// devices.WithTokenInvalidator. svc may be set later with SetService when
+// circular construction order requires it.
+func NewMQTTAuthHandler(secret, serviceUser string) *MQTTAuthHandler {
+	return &MQTTAuthHandler{inner: newMQTTAuthHandler(nil, secret, serviceUser)}
+}
+
+// SetService injects the devices.Service after construction.
+func (h *MQTTAuthHandler) SetService(svc *devices.Service) { h.inner.svc = svc }
+
+// Invalidate removes token from the in-memory lookup cache.
+func (h *MQTTAuthHandler) Invalidate(token string) { h.inner.Invalidate(token) }
 
 func NewRouter(flowSvc *flow.Service, devSvc *devices.Service, opts ...RouterOption) http.Handler {
 	cfg := &routerConfig{}
@@ -62,8 +88,13 @@ func NewRouter(flowSvc *flow.Service, devSvc *devices.Service, opts ...RouterOpt
 		})
 	}
 
-	if cfg.mqttSecret != "" && devSvc != nil {
-		mh := newMQTTAuthHandler(devSvc, cfg.mqttSecret, cfg.mqttServiceUser)
+	var mh *mqttAuthHandler
+	if cfg.mqttHandler != nil {
+		mh = cfg.mqttHandler
+	} else if cfg.mqttSecret != "" && devSvc != nil {
+		mh = newMQTTAuthHandler(devSvc, cfg.mqttSecret, cfg.mqttServiceUser)
+	}
+	if mh != nil {
 		r.Post("/api/mqtt/auth", mh.auth)
 		r.Post("/api/mqtt/acl", mh.acl)
 	}

@@ -48,7 +48,12 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
-	devSvc := devices.NewService(devstore.NewRepo(pool))
+	devRepo := devstore.NewRepo(pool)
+	// Build mqttAuth first so we can pass Invalidate as a callback into devSvc.
+	// devSvc is injected into mqttAuth after construction via SetService.
+	mqttAuth := api.NewMQTTAuthHandler(secret, mqUser)
+	devSvc := devices.NewService(devRepo, devices.WithTokenInvalidator(mqttAuth.Invalidate))
+	mqttAuth.SetService(devSvc)
 	router := ingest.NewRouter()
 	mgr := runtime.NewManager(router)
 	flowSvc := flow.NewService(ctx, flowstore.NewRepo(pool), mgr)
@@ -71,7 +76,7 @@ func main() {
 		}
 	}()
 
-	httpHandler := api.NewRouter(flowSvc, devSvc, api.WithMQTTAuth(secret, mqUser))
+	httpHandler := api.NewRouter(flowSvc, devSvc, api.WithMQTTAuthHandler(mqttAuth))
 	srv := &http.Server{Addr: addr, Handler: httpHandler, ReadTimeout: 10 * time.Second}
 
 	go func() {

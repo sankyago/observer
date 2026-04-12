@@ -19,9 +19,27 @@ type repo interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
-type Service struct{ repo repo }
+// Option configures a Service.
+type Option func(*Service)
 
-func NewService(r repo) *Service { return &Service{repo: r} }
+// WithTokenInvalidator registers a callback that is called with an old token
+// whenever a device token is rotated (RegenerateToken) or a device is deleted.
+func WithTokenInvalidator(f func(oldToken string)) Option {
+	return func(s *Service) { s.onTokenChange = f }
+}
+
+type Service struct {
+	repo          repo
+	onTokenChange func(oldToken string)
+}
+
+func NewService(r repo, opts ...Option) *Service {
+	s := &Service{repo: r}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
+}
 
 func (s *Service) Create(ctx context.Context, name string) (*store.Device, error) {
 	tok, err := generateToken()
@@ -55,6 +73,12 @@ func (s *Service) Rename(ctx context.Context, id uuid.UUID, name string) (*store
 }
 
 func (s *Service) RegenerateToken(ctx context.Context, id uuid.UUID) (*store.Device, error) {
+	old, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	oldToken := old.Token
+
 	tok, err := generateToken()
 	if err != nil {
 		return nil, err
@@ -62,11 +86,25 @@ func (s *Service) RegenerateToken(ctx context.Context, id uuid.UUID) (*store.Dev
 	if err := s.repo.UpdateToken(ctx, id, tok); err != nil {
 		return nil, err
 	}
+	if s.onTokenChange != nil {
+		s.onTokenChange(oldToken)
+	}
 	return s.repo.Get(ctx, id)
 }
 
 func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
-	return s.repo.Delete(ctx, id)
+	d, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	oldToken := d.Token
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
+	}
+	if s.onTokenChange != nil {
+		s.onTokenChange(oldToken)
+	}
+	return nil
 }
 
 func generateToken() (string, error) {

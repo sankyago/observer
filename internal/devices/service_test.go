@@ -128,3 +128,30 @@ func TestService_GetByToken(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, d.ID, got.ID)
 }
+
+func TestService_RegenerateToken_InvalidatesCallback(t *testing.T) {
+	var got string
+	svc := NewService(newFake(), WithTokenInvalidator(func(old string) { got = old }))
+	ctx := context.Background()
+
+	d, err := svc.Create(ctx, "dev")
+	require.NoError(t, err)
+	oldToken := d.Token
+
+	_, err = svc.RegenerateToken(ctx, d.ID)
+	require.NoError(t, err)
+	assert.Equal(t, oldToken, got, "callback must receive the old token")
+}
+
+func TestService_Delete_InvalidatesCallback(t *testing.T) {
+	var got string
+	svc := NewService(newFake(), WithTokenInvalidator(func(old string) { got = old }))
+	ctx := context.Background()
+
+	d, err := svc.Create(ctx, "dev")
+	require.NoError(t, err)
+	tok := d.Token
+
+	require.NoError(t, svc.Delete(ctx, d.ID))
+	assert.Equal(t, tok, got, "callback must receive the deleted device's token")
+}

@@ -194,6 +194,42 @@ func TestMQTTACL_MissingSecret(t *testing.T) {
 	assert.Equal(t, "deny", resultOf(t, rr))
 }
 
+// newMQTTRouterWithInvalidation builds a router whose auth handler's Invalidate
+// method is wired into the devices service via WithTokenInvalidator.
+func newMQTTRouterWithInvalidation(t *testing.T, secret, serviceUser string) (http.Handler, *devices.Service, *MQTTAuthHandler) {
+	t.Helper()
+	repo := &fakeDeviceRepo{items: map[uuid.UUID]*store.Device{}}
+	mqttH := NewMQTTAuthHandler(secret, serviceUser)
+	svc := devices.NewService(repo, devices.WithTokenInvalidator(mqttH.Invalidate))
+	mqttH.SetService(svc)
+	h := NewRouter(nil, svc, WithMQTTAuthHandler(mqttH))
+	return h, svc, mqttH
+}
+
+// TestMQTTAuth_CacheInvalidatedOnRotate verifies that after rotating a token
+// the OLD token is denied even though it was previously cached.
+func TestMQTTAuth_CacheInvalidatedOnRotate(t *testing.T) {
+	h, svc, _ := newMQTTRouterWithInvalidation(t, "secret", "observer-consumer")
+	ctx := context.Background()
+
+	d, err := svc.Create(ctx, "dev")
+	require.NoError(t, err)
+	oldToken := d.Token
+
+	// Populate the cache by successfully authing with the old token.
+	body := fmt.Sprintf(`{"username":%q,"password":"","clientid":"x"}`, oldToken)
+	rr := postJSON(t, h, "/api/mqtt/auth", "secret", body)
+	require.Equal(t, "allow", resultOf(t, rr))
+
+	// Rotate the token — this should invalidate the cache entry.
+	_, err = svc.RegenerateToken(ctx, d.ID)
+	require.NoError(t, err)
+
+	// Old token must now be denied.
+	rr = postJSON(t, h, "/api/mqtt/auth", "secret", body)
+	assert.Equal(t, "deny", resultOf(t, rr))
+}
+
 // TestMQTTAuth_DeniesOneByteMismatch verifies that a secret differing by a
 // single byte is rejected (constant-time compare contract).
 func TestMQTTAuth_DeniesOneByteMismatch(t *testing.T) {
