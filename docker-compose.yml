@@ -1,16 +1,4 @@
 services:
-  mosquitto:
-    image: eclipse-mosquitto:2
-    ports:
-      - "1883:1883"
-    volumes:
-      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
-    healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -W 3 | grep -q . || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 3
-
   timescaledb:
     image: timescale/timescaledb:latest-pg16
     ports:
@@ -24,3 +12,47 @@ services:
       interval: 5s
       timeout: 5s
       retries: 3
+
+  emqx:
+    image: emqx/emqx:5.7
+    hostname: emqx
+    environment:
+      EMQX_NAME: observer-emqx
+      EMQX_ALLOW_ANONYMOUS: "false"
+      EMQX_AUTHENTICATION__1__MECHANISM: "password_based"
+      EMQX_AUTHENTICATION__1__BACKEND: "http"
+      EMQX_AUTHENTICATION__1__METHOD: "post"
+      EMQX_AUTHENTICATION__1__URL: "http://app:8080/api/mqtt/auth"
+      EMQX_AUTHENTICATION__1__HEADERS__CONTENT-TYPE: "application/json"
+      EMQX_AUTHENTICATION__1__HEADERS__X-EMQX-SECRET: "dev-secret"
+      EMQX_AUTHENTICATION__1__BODY__USERNAME: "${username}"
+      EMQX_AUTHENTICATION__1__BODY__PASSWORD: "${password}"
+      EMQX_AUTHENTICATION__1__BODY__CLIENTID: "${clientid}"
+      EMQX_AUTHORIZATION__SOURCES__1__TYPE: "http"
+      EMQX_AUTHORIZATION__SOURCES__1__METHOD: "post"
+      EMQX_AUTHORIZATION__SOURCES__1__URL: "http://app:8080/api/mqtt/acl"
+      EMQX_AUTHORIZATION__SOURCES__1__HEADERS__CONTENT-TYPE: "application/json"
+      EMQX_AUTHORIZATION__SOURCES__1__HEADERS__X-EMQX-SECRET: "dev-secret"
+      EMQX_AUTHORIZATION__SOURCES__1__BODY__USERNAME: "${username}"
+      EMQX_AUTHORIZATION__SOURCES__1__BODY__ACTION: "${action}"
+      EMQX_AUTHORIZATION__SOURCES__1__BODY__TOPIC: "${topic}"
+      EMQX_AUTHORIZATION__NO_MATCH: "deny"
+    ports:
+      - "1883:1883"
+      - "8083:8083"
+      - "18083:18083"
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://observer:observer@timescaledb:5432/observer
+      EMQX_BROKER_URL: tcp://emqx:1883
+      EMQX_USERNAME: observer-consumer
+      EMQX_PASSWORD: observer-consumer-pw
+      EMQX_SHARED_GROUP: observer
+      MQTT_WEBHOOK_SECRET: dev-secret
+    depends_on:
+      timescaledb:
+        condition: service_healthy

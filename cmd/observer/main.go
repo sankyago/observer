@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -12,49 +13,70 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sankyago/observer/internal/api"
 	"github.com/sankyago/observer/internal/db"
+	"github.com/sankyago/observer/internal/devices"
+	devstore "github.com/sankyago/observer/internal/devices/store"
 	"github.com/sankyago/observer/internal/flow"
 	"github.com/sankyago/observer/internal/flow/runtime"
-	"github.com/sankyago/observer/internal/flow/store"
+	flowstore "github.com/sankyago/observer/internal/flow/store"
 	"github.com/sankyago/observer/internal/ingest"
 )
 
 func main() {
-	dbURL := envOrDefault("DATABASE_URL", "postgres://observer:observer@localhost:5432/observer")
-	addr := envOrDefault("HTTP_ADDR", ":8080")
-	migrationsDir := envOrDefault("MIGRATIONS_DIR", "migrations")
+	dbURL := env("DATABASE_URL", "postgres://observer:observer@localhost:5432/observer")
+	addr := env("HTTP_ADDR", ":8080")
+	migDir := env("MIGRATIONS_DIR", "migrations")
+	brokerURL := env("EMQX_BROKER_URL", "tcp://localhost:1883")
+	mqUser := env("EMQX_USERNAME", "observer-consumer")
+	mqPass := env("EMQX_PASSWORD", "")
+	mqGroup := env("EMQX_SHARED_GROUP", "observer")
+	secret := env("MQTT_WEBHOOK_SECRET", "")
+
+	if mqPass == "" || secret == "" {
+		log.Fatal("EMQX_PASSWORD and MQTT_WEBHOOK_SECRET are required")
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
-		log.Fatalf("pgx connect: %v", err)
+		log.Fatalf("pg: %v", err)
 	}
 	defer pool.Close()
 
-	if err := db.Migrate(ctx, pool, migrationsDir); err != nil {
+	if err := db.Migrate(ctx, pool, migDir); err != nil {
 		log.Fatalf("migrate: %v", err)
 	}
 
+	devSvc := devices.NewService(devstore.NewRepo(pool))
 	router := ingest.NewRouter()
-	repo := store.NewRepo(pool)
 	mgr := runtime.NewManager(router)
-	svc := flow.NewService(ctx, repo, mgr)
+	flowSvc := flow.NewService(ctx, flowstore.NewRepo(pool), mgr)
 
-	if err := svc.LoadEnabled(ctx); err != nil {
-		log.Fatalf("load enabled flows: %v", err)
+	if err := flowSvc.LoadEnabled(ctx); err != nil {
+		log.Fatalf("load flows: %v", err)
 	}
 
-	server := &http.Server{
-		Addr:         addr,
-		Handler:      api.NewRouter(svc, nil),
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 0, // WS needs no write timeout
-	}
+	consumer := ingest.NewConsumer(ingest.Config{
+		BrokerURL:   brokerURL,
+		Username:    mqUser,
+		Password:    mqPass,
+		SharedGroup: mqGroup,
+		ClientID:    fmt.Sprintf("observer-%d", time.Now().UnixNano()),
+	}, router)
+
+	go func() {
+		if err := consumer.Run(ctx); err != nil {
+			log.Printf("consumer exited: %v", err)
+		}
+	}()
+
+	httpHandler := api.NewRouter(flowSvc, devSvc, api.WithMQTTAuth(secret, mqUser))
+	srv := &http.Server{Addr: addr, Handler: httpHandler, ReadTimeout: 10 * time.Second}
 
 	go func() {
 		log.Printf("listening on %s", addr)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("http: %v", err)
 		}
 	}()
@@ -62,17 +84,16 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	<-sig
-	log.Println("shutting down")
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer shutdownCancel()
-	_ = server.Shutdown(shutdownCtx)
+	shutdownCtx, sc := context.WithTimeout(context.Background(), 5*time.Second)
+	defer sc()
+	_ = srv.Shutdown(shutdownCtx)
 	mgr.StopAll()
 }
 
-func envOrDefault(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
+func env(k, d string) string {
+	if v := os.Getenv(k); v != "" {
 		return v
 	}
-	return fallback
+	return d
 }
