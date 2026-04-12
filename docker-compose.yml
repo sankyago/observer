@@ -24,3 +24,17 @@ services:
       interval: 5s
       timeout: 5s
       retries: 3
+
+  app:
+    build: .
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://observer:observer@timescaledb:5432/observer?sslmode=disable
+      HTTP_ADDR: ":8080"
+      MIGRATIONS_DIR: /migrations
+    ports:
+      - "8080:8080"
