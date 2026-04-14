@@ -79,6 +79,9 @@ export type Dashboard = {
 
 export type DashboardInput = { name: string; layout: DashboardLayout };
 
+export type ChatMessage = { role: 'user' | 'assistant'; content: string };
+export type ChatReply = { role: 'assistant'; content: string; created_at: string };
+
 const BASE = '/api/v1';
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -126,4 +129,6 @@ export const api = {
       'GET',
       `/telemetry/recent?device_id=${deviceId}&limit=${limit}`,
     ),
+
+  chat: (messages: ChatMessage[]) => req<ChatReply>('POST', '/chat', { messages }),
 };

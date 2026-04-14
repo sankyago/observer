@@ -65,6 +65,8 @@ func BuildRouter(d Deps) http.Handler {
 		r.Put("/flows/{id}", d.updateFlow)
 		r.Delete("/flows/{id}", d.deleteFlow)
 
+		r.Post("/chat", d.chat)
+
 		r.Get("/telemetry/recent", d.recentTelemetry)
 
 		r.Get("/stream", d.stream)
