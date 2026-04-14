@@ -9,7 +9,7 @@ export type Device = {
 export type Action = {
   id: string;
   tenant_id: string;
-  kind: 'log' | 'webhook' | 'email';
+  kind: 'log' | 'webhook' | 'email' | 'workflow';
   config: Record<string, unknown>;
   created_at: string;
 };

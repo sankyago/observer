@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, message } from 'antd';
+import {
+  Button, Drawer, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message,
+} from 'antd';
 import { api, type Action } from '../api';
+import WorkflowCanvas, { emptyWorkflow, toBackendConfig, type WorkflowState } from '../workflows/WorkflowCanvas';
 
 export default function ActionsPage() {
   const [rows, setRows] = useState<Action[]>([]);
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [form] = Form.useForm<{ kind: Action['kind']; url?: string }>();
+
+  // simple-action modal
+  const [simpleOpen, setSimpleOpen] = useState(false);
+  const [simpleForm] = Form.useForm<{ kind: Action['kind']; url?: string }>();
+
+  // workflow drawer
+  const [wfOpen, setWfOpen] = useState(false);
+  const [wf, setWf] = useState<WorkflowState>(emptyWorkflow());
 
   const refresh = async () => {
     setLoading(true);
@@ -21,14 +30,29 @@ export default function ActionsPage() {
 
   useEffect(() => { refresh(); }, []);
 
-  const onCreate = async () => {
-    const vals = await form.validateFields();
+  const createSimple = async () => {
+    const vals = await simpleForm.validateFields();
     const config: Record<string, unknown> = {};
     if (vals.kind === 'webhook' && vals.url) config.url = vals.url;
     try {
       await api.createAction(vals.kind, config);
-      setOpen(false);
-      form.resetFields();
+      setSimpleOpen(false);
+      simpleForm.resetFields();
+      refresh();
+    } catch (e) {
+      message.error(String(e));
+    }
+  };
+
+  const saveWorkflow = async () => {
+    if (wf.nodes.length === 0) {
+      message.error('Drop at least one node');
+      return;
+    }
+    try {
+      await api.createAction('workflow', toBackendConfig(wf));
+      setWfOpen(false);
+      setWf(emptyWorkflow());
       refresh();
     } catch (e) {
       message.error(String(e));
@@ -38,24 +62,39 @@ export default function ActionsPage() {
   return (
     <div>
       <Space style={{ marginBottom: 16 }}>
-        <Button type="primary" onClick={() => setOpen(true)}>New action</Button>
+        <Button type="primary" onClick={() => setWfOpen(true)}>New workflow</Button>
+        <Button onClick={() => setSimpleOpen(true)}>New simple action</Button>
         <Button onClick={refresh}>Refresh</Button>
       </Space>
+
       <Table
         rowKey="id"
         loading={loading}
         dataSource={rows}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 320 },
-          { title: 'Kind', dataIndex: 'kind', width: 100 },
+          {
+            title: 'Kind',
+            dataIndex: 'kind',
+            width: 120,
+            render: (k: string) => (
+              <Tag color={k === 'workflow' ? 'purple' : 'blue'}>{k}</Tag>
+            ),
+          },
           {
             title: 'Config',
-            render: (_, r: Action) => <code>{JSON.stringify(r.config)}</code>,
+            render: (_: unknown, r: Action) => (
+              <code style={{ fontSize: 12 }}>
+                {r.kind === 'workflow'
+                  ? `${(r.config.nodes as unknown[] | undefined)?.length ?? 0} nodes, ${(r.config.edges as unknown[] | undefined)?.length ?? 0} edges`
+                  : JSON.stringify(r.config)}
+              </code>
+            ),
           },
           {
             title: '',
             width: 100,
-            render: (_, r: Action) => (
+            render: (_: unknown, r: Action) => (
               <Popconfirm title="Delete?" onConfirm={() => api.deleteAction(r.id).then(refresh)}>
                 <Button danger size="small">Delete</Button>
               </Popconfirm>
@@ -63,8 +102,14 @@ export default function ActionsPage() {
           },
         ]}
       />
-      <Modal title="New action" open={open} onOk={onCreate} onCancel={() => setOpen(false)}>
-        <Form form={form} layout="vertical" initialValues={{ kind: 'log' }}>
+
+      <Modal
+        title="New simple action"
+        open={simpleOpen}
+        onOk={createSimple}
+        onCancel={() => setSimpleOpen(false)}
+      >
+        <Form form={simpleForm} layout="vertical" initialValues={{ kind: 'log' }}>
           <Form.Item name="kind" label="Kind" rules={[{ required: true }]}>
             <Select options={[
               { value: 'log', label: 'log' },
@@ -72,7 +117,7 @@ export default function ActionsPage() {
               { value: 'email', label: 'email' },
             ]} />
           </Form.Item>
-          <Form.Item noStyle shouldUpdate={(prev, next) => prev.kind !== next.kind}>
+          <Form.Item noStyle shouldUpdate={(p, n) => p.kind !== n.kind}>
             {({ getFieldValue }) =>
               getFieldValue('kind') === 'webhook' ? (
                 <Form.Item name="url" label="Webhook URL" rules={[{ required: true }]}>
@@ -83,6 +128,22 @@ export default function ActionsPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Drawer
+        title="New workflow"
+        placement="right"
+        width={1100}
+        open={wfOpen}
+        onClose={() => setWfOpen(false)}
+        extra={
+          <Space>
+            <Button onClick={() => setWfOpen(false)}>Cancel</Button>
+            <Button type="primary" onClick={saveWorkflow}>Save</Button>
+          </Space>
+        }
+      >
+        <WorkflowCanvas value={wf} onChange={setWf} />
+      </Drawer>
     </div>
   );
 }
