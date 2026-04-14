@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Drawer, Form, Input, Modal, Popconfirm, Space, Table, message } from 'antd';
 import { api, type Device } from '../api';
-import DeviceChart from '../devices/DeviceChart';
+import DeviceViewer from '../devices/DeviceViewer';
 
 export default function DevicesPage() {
   const [rows, setRows] = useState<Device[]>([]);
@@ -85,12 +85,13 @@ export default function DevicesPage() {
       <Drawer
         title={selected ? `${selected.name} — telemetry` : ''}
         placement="right"
-        width={760}
+        width={900}
         open={!!selected}
         onClose={() => setSelected(null)}
         destroyOnClose
+        styles={{ body: { height: 'calc(100vh - 56px)', padding: 16 } }}
       >
-        {selected && <DeviceChart deviceId={selected.id} />}
+        {selected && <DeviceViewer deviceId={selected.id} />}
       </Drawer>
     </div>
   );
