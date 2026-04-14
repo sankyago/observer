@@ -127,6 +127,10 @@ export default function FlowCanvas({ value, onChange, devices }: Props) {
           onNodeClick={(_, n) => setSelected(n.id)}
           onPaneClick={() => setSelected(null)}
           fitView
+          fitViewOptions={{ padding: 0.3, maxZoom: 1 }}
+          defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
+          minZoom={0.2}
+          maxZoom={2}
         >
           <Background />
           <Controls />
