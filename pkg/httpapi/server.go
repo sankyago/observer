@@ -42,7 +42,22 @@ func BuildRouter(d Deps) http.Handler {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/devices", d.listDevices)
 		r.Post("/devices", d.createDevice)
+		r.Put("/devices/{id}", d.updateDevice)
 		r.Delete("/devices/{id}", d.deleteDevice)
+
+		r.Get("/profiles", d.listProfiles)
+		r.Post("/profiles", d.createProfile)
+		r.Delete("/profiles/{id}", d.deleteProfile)
+
+		r.Get("/groups", d.listGroups)
+		r.Post("/groups", d.createGroup)
+		r.Delete("/groups/{id}", d.deleteGroup)
+
+		r.Get("/dashboards", d.listDashboards)
+		r.Post("/dashboards", d.createDashboard)
+		r.Get("/dashboards/{id}", d.getDashboard)
+		r.Put("/dashboards/{id}", d.updateDashboard)
+		r.Delete("/dashboards/{id}", d.deleteDashboard)
 
 		r.Get("/flows", d.listFlows)
 		r.Post("/flows", d.createFlow)

@@ -21,7 +21,10 @@ func newPool(t *testing.T) (*pgxpool.Pool, uuid.UUID) {
 	for _, s := range []string{
 		`CREATE EXTENSION IF NOT EXISTS pgcrypto`,
 		`CREATE TABLE tenants (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), slug TEXT UNIQUE, name TEXT, created_at TIMESTAMPTZ DEFAULT now())`,
-		`CREATE TABLE devices (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID REFERENCES tenants(id), name TEXT, type TEXT DEFAULT '', created_at TIMESTAMPTZ DEFAULT now())`,
+		`CREATE TABLE device_profiles (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID REFERENCES tenants(id), name TEXT, default_fields TEXT[] DEFAULT '{}', created_at TIMESTAMPTZ DEFAULT now())`,
+		`CREATE TABLE device_groups (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID REFERENCES tenants(id), name TEXT, created_at TIMESTAMPTZ DEFAULT now())`,
+		`CREATE TABLE devices (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID REFERENCES tenants(id), name TEXT, type TEXT DEFAULT '', profile_id UUID, group_id UUID, created_at TIMESTAMPTZ DEFAULT now())`,
+		`CREATE TABLE dashboards (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID REFERENCES tenants(id), name TEXT, layout JSONB DEFAULT '{"widgets":[]}', created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now())`,
 		`CREATE TABLE flows (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID REFERENCES tenants(id), name TEXT, graph JSONB, enabled BOOLEAN DEFAULT TRUE, created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now())`,
 	} {
 		if _, err := pool.Exec(ctx, s); err != nil { t.Fatalf("schema: %v", err) }
