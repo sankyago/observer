@@ -15,6 +15,7 @@ export default function ActionsPage() {
   const [wfOpen, setWfOpen] = useState(false);
   const [wf, setWf] = useState<WorkflowState>(emptyWorkflow());
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [simpleEditingId, setSimpleEditingId] = useState<string | null>(null);
 
   const refresh = async () => {
     setLoading(true);
@@ -37,13 +38,26 @@ export default function ActionsPage() {
     setWfOpen(true);
   };
 
-  const createSimple = async () => {
+  const openEditSimple = (a: Action) => {
+    setSimpleEditingId(a.id);
+    simpleForm.setFieldsValue({
+      kind: a.kind,
+      url: (a.config?.url as string | undefined) ?? '',
+    });
+    setSimpleOpen(true);
+  };
+
+  const saveSimple = async () => {
     const vals = await simpleForm.validateFields();
     const config: Record<string, unknown> = {};
     if (vals.kind === 'webhook' && vals.url) config.url = vals.url;
     try {
-      await api.createAction(vals.kind, config);
-      setSimpleOpen(false); simpleForm.resetFields(); refresh();
+      if (simpleEditingId) {
+        await api.updateAction(simpleEditingId, vals.kind, config);
+      } else {
+        await api.createAction(vals.kind, config);
+      }
+      setSimpleOpen(false); setSimpleEditingId(null); simpleForm.resetFields(); refresh();
     } catch (e) { message.error(String(e)); }
   };
 
@@ -63,7 +77,7 @@ export default function ActionsPage() {
     <div>
       <Space style={{ marginBottom: 16 }}>
         <Button type="primary" onClick={openNewWorkflow}>New workflow</Button>
-        <Button onClick={() => setSimpleOpen(true)}>New simple action</Button>
+        <Button onClick={() => { setSimpleEditingId(null); simpleForm.resetFields(); setSimpleOpen(true); }}>New simple action</Button>
         <Button onClick={refresh}>Refresh</Button>
       </Space>
 
@@ -72,8 +86,11 @@ export default function ActionsPage() {
         loading={loading}
         dataSource={rows}
         onRow={(r: Action) => ({
-          onClick: () => { if (r.kind === 'workflow') openEditWorkflow(r); },
-          style: r.kind === 'workflow' ? { cursor: 'pointer' } : undefined,
+          onClick: () => {
+            if (r.kind === 'workflow') openEditWorkflow(r);
+            else openEditSimple(r);
+          },
+          style: { cursor: 'pointer' },
         })}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 320 },
@@ -107,7 +124,12 @@ export default function ActionsPage() {
         ]}
       />
 
-      <Modal title="New simple action" open={simpleOpen} onOk={createSimple} onCancel={() => setSimpleOpen(false)}>
+      <Modal
+        title={simpleEditingId ? `Edit ${simpleEditingId.slice(0, 8)}` : 'New simple action'}
+        open={simpleOpen}
+        onOk={saveSimple}
+        onCancel={() => { setSimpleOpen(false); setSimpleEditingId(null); }}
+      >
         <Form form={simpleForm} layout="vertical" initialValues={{ kind: 'log' }}>
           <Form.Item name="kind" label="Kind" rules={[{ required: true }]}>
             <Select options={[
