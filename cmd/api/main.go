@@ -1,5 +1,3 @@
-// Command api serves the HTTP control plane.
-// v1 stub: loads config, opens DB, blocks until SIGINT/SIGTERM.
 package main
 
 import (
@@ -8,9 +6,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/observer-io/observer/internal/runservice/api"
 	"github.com/observer-io/observer/pkg/config"
-	"github.com/observer-io/observer/pkg/db"
-	"github.com/observer-io/observer/pkg/log"
+	"github.com/observer-io/observer/pkg/events"
 )
 
 func main() {
@@ -18,20 +16,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	logger := log.New(cfg.Log.Level)
-	logger.Info("api starting")
-
-	pool, err := db.NewPool(context.Background(), cfg.DB.DSN)
-	if err != nil {
-		logger.Error("db", "err", err)
-		os.Exit(1)
-	}
-	defer pool.Close()
-
-	logger.Info("api ready")
-
+	bus := events.NewBus(64)
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	<-ctx.Done()
-	logger.Info("api shutting down")
+	if err := api.Run(ctx, cfg, bus); err != nil {
+		os.Exit(1)
+	}
 }
