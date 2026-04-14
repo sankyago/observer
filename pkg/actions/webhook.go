@@ -19,7 +19,7 @@ type webhookConfig struct {
 
 func (a WebhookAction) Run(ctx context.Context, in Input) error {
 	var cfg webhookConfig
-	if err := json.Unmarshal(in.Action.Config, &cfg); err != nil {
+	if err := json.Unmarshal(in.Config, &cfg); err != nil {
 		return fmt.Errorf("parse config: %w", err)
 	}
 	if cfg.URL == "" {
@@ -27,7 +27,8 @@ func (a WebhookAction) Run(ctx context.Context, in Input) error {
 	}
 
 	body, _ := json.Marshal(map[string]any{
-		"rule_id":    in.RuleID,
+		"flow_id":    in.FlowID,
+		"node_id":    in.NodeID,
 		"device_id":  in.DeviceID,
 		"tenant_id":  in.TenantID,
 		"message_id": in.MessageID,

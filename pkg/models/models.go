@@ -1,5 +1,3 @@
-// Package models defines the Go structs that mirror the database schema.
-// Keep in sync with migrations under ./migrations.
 package models
 
 import (
@@ -39,43 +37,12 @@ type DeviceCredentials struct {
 	CreatedAt    time.Time
 }
 
-type ActionKind string
-
-const (
-	ActionLog      ActionKind = "log"
-	ActionWebhook  ActionKind = "webhook"
-	ActionEmail    ActionKind = "email"
-	ActionWorkflow ActionKind = "workflow"
-)
-
-type Action struct {
+type Flow struct {
 	ID        uuid.UUID
 	TenantID  uuid.UUID
-	Kind      ActionKind
-	Config    []byte // raw JSON
+	Name      string
+	Graph     []byte // JSON bytes — {nodes, edges}
+	Enabled   bool
 	CreatedAt time.Time
-}
-
-type RuleOp string
-
-const (
-	OpGT  RuleOp = ">"
-	OpLT  RuleOp = "<"
-	OpGTE RuleOp = ">="
-	OpLTE RuleOp = "<="
-	OpEQ  RuleOp = "="
-	OpNEQ RuleOp = "!="
-)
-
-type Rule struct {
-	ID         uuid.UUID
-	TenantID   uuid.UUID
-	DeviceID   uuid.UUID
-	Field      string
-	Op         RuleOp
-	Value      float64
-	ActionID   uuid.UUID
-	Enabled    bool
-	DebugUntil *time.Time
-	CreatedAt  time.Time
+	UpdatedAt time.Time
 }

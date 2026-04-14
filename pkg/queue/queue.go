@@ -12,10 +12,12 @@ type Job struct {
 	ID            uuid.UUID
 	TenantID      uuid.UUID
 	DeviceID      uuid.UUID
-	RuleID        uuid.UUID
-	ActionID      uuid.UUID
+	FlowID        uuid.UUID
+	NodeID        string // action node ID within the flow graph
+	Kind          string // "log" | "webhook" | "email"
+	Config        []byte // action's JSON config
 	MessageID     uuid.UUID
-	Payload       []byte // raw telemetry JSON snapshot
+	Payload       []byte // raw telemetry JSON
 	CorrelationID uuid.UUID
 }
 

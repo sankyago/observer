@@ -44,15 +44,11 @@ func BuildRouter(d Deps) http.Handler {
 		r.Post("/devices", d.createDevice)
 		r.Delete("/devices/{id}", d.deleteDevice)
 
-		r.Get("/actions", d.listActions)
-		r.Post("/actions", d.createAction)
-		r.Put("/actions/{id}", d.updateAction)
-		r.Delete("/actions/{id}", d.deleteAction)
-
-		r.Get("/rules", d.listRules)
-		r.Post("/rules", d.createRule)
-		r.Put("/rules/{id}", d.updateRule)
-		r.Delete("/rules/{id}", d.deleteRule)
+		r.Get("/flows", d.listFlows)
+		r.Post("/flows", d.createFlow)
+		r.Get("/flows/{id}", d.getFlow)
+		r.Put("/flows/{id}", d.updateFlow)
+		r.Delete("/flows/{id}", d.deleteFlow)
 
 		r.Get("/telemetry/recent", d.recentTelemetry)
 

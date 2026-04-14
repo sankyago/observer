@@ -38,13 +38,13 @@ func applyMigrations(t *testing.T, pool *pgxpool.Pool) {
 			payload JSONB NOT NULL
 		)`,
 		`SELECT create_hypertable('telemetry_raw','time')`,
-		`CREATE TABLE fired_actions (
+		`CREATE TABLE flow_executions (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			fired_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			executed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			tenant_id UUID NOT NULL,
 			device_id UUID NOT NULL,
-			rule_id UUID NOT NULL,
-			action_id UUID NOT NULL,
+			flow_id UUID NOT NULL,
+			node_id TEXT NOT NULL,
 			message_id UUID NOT NULL,
 			status TEXT NOT NULL CHECK (status IN ('ok','error')),
 			error TEXT,
@@ -58,7 +58,7 @@ func applyMigrations(t *testing.T, pool *pgxpool.Pool) {
 	}
 }
 
-func TestInsertRawAndFired(t *testing.T) {
+func TestInsertExecution(t *testing.T) {
 	if testing.Short() {
 		t.Skip("container test")
 	}
@@ -67,6 +67,7 @@ func TestInsertRawAndFired(t *testing.T) {
 
 	tenantID := uuid.New()
 	deviceID := uuid.New()
+	flowID := uuid.New()
 	messageID := uuid.New()
 	payload := json.RawMessage(`{"temperature":72}`)
 
@@ -85,18 +86,16 @@ func TestInsertRawAndFired(t *testing.T) {
 		t.Fatalf("got %d rows, want 1", n)
 	}
 
-	ruleID := uuid.New()
-	actionID := uuid.New()
-	if err := InsertFired(ctx, pool, FiredRow{
-		TenantID: tenantID, DeviceID: deviceID, RuleID: ruleID, ActionID: actionID,
+	if err := InsertExecution(ctx, pool, ExecutionRow{
+		TenantID: tenantID, DeviceID: deviceID, FlowID: flowID, NodeID: "a1",
 		MessageID: messageID, Status: "ok", Payload: payload,
 	}); err != nil {
-		t.Fatalf("InsertFired: %v", err)
+		t.Fatalf("InsertExecution: %v", err)
 	}
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM fired_actions WHERE message_id=$1`, messageID).Scan(&n); err != nil {
-		t.Fatalf("query fired: %v", err)
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM flow_executions WHERE message_id=$1`, messageID).Scan(&n); err != nil {
+		t.Fatalf("query execution: %v", err)
 	}
 	if n != 1 {
-		t.Fatalf("fired rows got %d want 1", n)
+		t.Fatalf("execution rows got %d want 1", n)
 	}
 }

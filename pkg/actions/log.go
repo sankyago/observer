@@ -11,7 +11,8 @@ type LogAction struct {
 
 func (a LogAction) Run(_ context.Context, in Input) error {
 	a.Logger.Info("ALERT",
-		"rule_id", in.RuleID,
+		"flow_id", in.FlowID,
+		"node_id", in.NodeID,
 		"device_id", in.DeviceID,
 		"message_id", in.MessageID,
 		"payload", string(in.Payload),

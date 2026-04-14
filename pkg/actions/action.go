@@ -1,4 +1,3 @@
-// Package actions defines the Action interface and concrete implementations.
 package actions
 
 import (
@@ -6,13 +5,13 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-
-	"github.com/observer-io/observer/pkg/models"
 )
 
 type Input struct {
-	Action    models.Action
-	RuleID    uuid.UUID
+	Kind      string
+	Config    []byte // JSON
+	FlowID    uuid.UUID
+	NodeID    string
 	DeviceID  uuid.UUID
 	TenantID  uuid.UUID
 	MessageID uuid.UUID
@@ -24,29 +23,29 @@ type Runner interface {
 }
 
 type Registry struct {
-	Log      Runner
-	Webhook  Runner
-	Workflow Runner
+	Log     Runner
+	Webhook Runner
+	Email   Runner
 }
 
-func (r *Registry) Run(ctx context.Context, in Input) error {
-	switch in.Action.Kind {
-	case models.ActionLog:
+func (r Registry) Run(ctx context.Context, in Input) error {
+	switch in.Kind {
+	case "log":
 		if r.Log == nil {
-			return fmt.Errorf("log action not configured")
+			return fmt.Errorf("log runner not configured")
 		}
 		return r.Log.Run(ctx, in)
-	case models.ActionWebhook:
+	case "webhook":
 		if r.Webhook == nil {
-			return fmt.Errorf("webhook action not configured")
+			return fmt.Errorf("webhook runner not configured")
 		}
 		return r.Webhook.Run(ctx, in)
-	case models.ActionWorkflow:
-		if r.Workflow == nil {
-			return fmt.Errorf("workflow action not configured")
+	case "email":
+		if r.Email == nil {
+			return fmt.Errorf("email runner not configured")
 		}
-		return r.Workflow.Run(ctx, in)
+		return r.Email.Run(ctx, in)
 	default:
-		return fmt.Errorf("unknown action kind: %s", in.Action.Kind)
+		return fmt.Errorf("unknown action kind: %s", in.Kind)
 	}
 }
