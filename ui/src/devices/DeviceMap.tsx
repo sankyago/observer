@@ -7,14 +7,37 @@ import { Empty } from 'antd';
 import { api } from '../api';
 import { useSse } from '../useSse';
 
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
+// Small, self-contained DivIcon — avoids broken <img> pins when Leaflet's
+// default asset paths fail to resolve inside the Vite bundle.
+function dotIcon(color: string, heading: number | null, speed: number | null): L.DivIcon {
+  const arrow = heading !== null
+    ? `<div style="position:absolute;top:-14px;left:50%;transform:translateX(-50%) rotate(${heading}deg);transform-origin:50% 34px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid ${color};"></div>`
+    : '';
+  const badge = speed !== null && Number.isFinite(speed)
+    ? `<div style="position:absolute;top:-8px;right:-8px;background:#000;color:#fff;font:600 10px system-ui;padding:1px 5px;border-radius:8px;">${speed.toFixed(0)}</div>`
+    : '';
+  return L.divIcon({
+    html: `
+      <div style="position:relative;">
+        ${arrow}
+        <div style="width:20px;height:20px;border-radius:50%;background:${color};border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,.35);"></div>
+        ${badge}
+      </div>`,
+    className: 'observer-device-marker',
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
+}
+
+function bearing(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const toDeg = (r: number) => (r * 180) / Math.PI;
+  const lat1 = toRad(a.lat), lat2 = toRad(b.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
 
 const TRAIL_LEN = 60;
 
@@ -114,7 +137,14 @@ export default function DeviceMap({ deviceId }: { deviceId: string }) {
             pathOptions={{ color: '#1677ff', weight: 3, opacity: s.opacity }}
           />
         ))}
-        <Marker position={[latest.lat, latest.lng]}>
+        <Marker
+          position={[latest.lat, latest.lng]}
+          icon={dotIcon(
+            '#1677ff',
+            trail.length >= 2 ? bearing(trail[trail.length - 2], latest) : null,
+            typeof latest.payload.speed === 'number' ? (latest.payload.speed as number) : null,
+          )}
+        >
           <Popup>
             <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>
               {new Date(latest.time).toLocaleString()}
