@@ -20,7 +20,7 @@ func main() {
 	defer q.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	if err := runner.Run(ctx, cfg, q); err != nil {
+	if err := runner.Run(ctx, cfg, q, nil); err != nil {
 		os.Exit(1)
 	}
 }

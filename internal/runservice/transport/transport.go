@@ -12,6 +12,7 @@ import (
 
 	"github.com/observer-io/observer/pkg/config"
 	"github.com/observer-io/observer/pkg/db"
+	"github.com/observer-io/observer/pkg/events"
 	observerlog "github.com/observer-io/observer/pkg/log"
 	"github.com/observer-io/observer/pkg/mqtt"
 	"github.com/observer-io/observer/pkg/queue"
@@ -22,7 +23,7 @@ import (
 
 // Run connects to Postgres and EMQX, subscribes to the shared telemetry topic,
 // and processes messages until ctx is done.
-func Run(ctx context.Context, cfg *config.Config, q queue.Queue) error {
+func Run(ctx context.Context, cfg *config.Config, q queue.Queue, bus *events.Bus) error {
 	logger := observerlog.New(cfg.Log.Level).With("svc", "transport")
 	logger.Info("transport starting")
 
@@ -62,12 +63,12 @@ func Run(ctx context.Context, cfg *config.Config, q queue.Queue) error {
 			if !ok {
 				return nil
 			}
-			handle(ctx, logger, pool, cache, q, msg)
+			handle(ctx, logger, pool, cache, q, msg, bus)
 		}
 	}
 }
 
-func handle(ctx context.Context, logger *slog.Logger, pool *pgxpool.Pool, cache *rules.Cache, q queue.Queue, msg mqtt.Message) {
+func handle(ctx context.Context, logger *slog.Logger, pool *pgxpool.Pool, cache *rules.Cache, q queue.Queue, msg mqtt.Message, bus *events.Bus) {
 	parsed, err := topic.ParseTelemetry(msg.Topic)
 	if err != nil {
 		logger.Warn("bad topic", "topic", msg.Topic)
@@ -92,6 +93,16 @@ func handle(ctx context.Context, logger *slog.Logger, pool *pgxpool.Pool, cache 
 		MessageID: messageID, Payload: msg.Payload,
 	}); err != nil {
 		logger.Error("insert raw", "err", err)
+	}
+
+	if bus != nil {
+		body, _ := json.Marshal(map[string]any{
+			"time":       time.Now().UTC(),
+			"device_id":  parsed.DeviceID,
+			"message_id": messageID,
+			"payload":    json.RawMessage(msg.Payload),
+		})
+		bus.Publish(events.Event{Type: "telemetry", Data: body})
 	}
 
 	for _, r := range cache.GetByDevice(parsed.DeviceID) {
