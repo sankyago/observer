@@ -30,8 +30,8 @@ func (d Deps) createAction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if in.Kind != "log" && in.Kind != "webhook" && in.Kind != "email" {
-		writeError(w, http.StatusBadRequest, "kind must be log|webhook|email")
+	if in.Kind != "log" && in.Kind != "webhook" && in.Kind != "email" && in.Kind != "workflow" {
+		writeError(w, http.StatusBadRequest, "kind must be log|webhook|email|workflow")
 		return
 	}
 	a, err := repo.CreateAction(r.Context(), d.Pool, DevTenantID, in.Kind, in.Config)

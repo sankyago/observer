@@ -24,11 +24,12 @@ type Runner interface {
 }
 
 type Registry struct {
-	Log     Runner
-	Webhook Runner
+	Log      Runner
+	Webhook  Runner
+	Workflow Runner
 }
 
-func (r Registry) Run(ctx context.Context, in Input) error {
+func (r *Registry) Run(ctx context.Context, in Input) error {
 	switch in.Action.Kind {
 	case models.ActionLog:
 		if r.Log == nil {
@@ -40,6 +41,11 @@ func (r Registry) Run(ctx context.Context, in Input) error {
 			return fmt.Errorf("webhook action not configured")
 		}
 		return r.Webhook.Run(ctx, in)
+	case models.ActionWorkflow:
+		if r.Workflow == nil {
+			return fmt.Errorf("workflow action not configured")
+		}
+		return r.Workflow.Run(ctx, in)
 	default:
 		return fmt.Errorf("unknown action kind: %s", in.Action.Kind)
 	}

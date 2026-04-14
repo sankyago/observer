@@ -42,9 +42,10 @@ type DeviceCredentials struct {
 type ActionKind string
 
 const (
-	ActionLog     ActionKind = "log"
-	ActionWebhook ActionKind = "webhook"
-	ActionEmail   ActionKind = "email"
+	ActionLog      ActionKind = "log"
+	ActionWebhook  ActionKind = "webhook"
+	ActionEmail    ActionKind = "email"
+	ActionWorkflow ActionKind = "workflow"
 )
 
 type Action struct {

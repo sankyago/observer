@@ -30,10 +30,11 @@ func Run(ctx context.Context, cfg *config.Config, q queue.Queue, bus *events.Bus
 	}
 	defer pool.Close()
 
-	reg := actions.Registry{
+	reg := &actions.Registry{
 		Log:     actions.LogAction{Logger: logger},
 		Webhook: actions.WebhookAction{Client: &http.Client{Timeout: 5 * time.Second}},
 	}
+	reg.Workflow = actions.WorkflowAction{Registry: reg}
 
 	logger.Info("runner ready")
 	return q.Consume(ctx, func(jctx context.Context, j queue.Job) error {
@@ -41,7 +42,7 @@ func Run(ctx context.Context, cfg *config.Config, q queue.Queue, bus *events.Bus
 	})
 }
 
-func execute(ctx context.Context, logger *slog.Logger, pool *pgxpool.Pool, reg actions.Registry, j queue.Job, bus *events.Bus) error {
+func execute(ctx context.Context, logger *slog.Logger, pool *pgxpool.Pool, reg *actions.Registry, j queue.Job, bus *events.Bus) error {
 	var action models.Action
 	var kind string
 	if err := pool.QueryRow(ctx,
