@@ -80,7 +80,7 @@ export default function FlowCanvas({ value, onChange, devices }: Props) {
   const selectedNode = selected ? value.nodes.find((n) => n.id === selected) : undefined;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 320px', gap: 16, height: 500 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 320px', gap: 16, height: 'calc(100vh - 220px)' }}>
       <Space direction="vertical" style={{ padding: 8 }}>
         <Typography.Text strong>Add node</Typography.Text>
         <Button block onClick={() => addNode('device')}>Device</Button>
