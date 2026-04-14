@@ -59,7 +59,6 @@ func CreateRule(ctx context.Context, pool *pgxpool.Pool, tenantID uuid.UUID, in 
 	if err != nil {
 		return Rule{}, err
 	}
-	_, _ = pool.Exec(ctx, "SELECT pg_notify('rules_changed', $1)", r.DeviceID.String())
 	return r, nil
 }
 
@@ -74,14 +73,10 @@ func UpdateRule(ctx context.Context, pool *pgxpool.Pool, tenantID, ruleID uuid.U
 	if err != nil {
 		return Rule{}, err
 	}
-	_, _ = pool.Exec(ctx, "SELECT pg_notify('rules_changed', $1)", r.DeviceID.String())
 	return r, nil
 }
 
 func DeleteRule(ctx context.Context, pool *pgxpool.Pool, tenantID, ruleID uuid.UUID) error {
 	_, err := pool.Exec(ctx, `DELETE FROM rules WHERE tenant_id=$1 AND id=$2`, tenantID, ruleID)
-	if err == nil {
-		_, _ = pool.Exec(ctx, "SELECT pg_notify('rules_changed', '')")
-	}
 	return err
 }
