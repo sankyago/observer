@@ -30,3 +30,6 @@ Thumbs.db
 
 # ui dependencies
 ui/node_modules/
+
+# Claude Code session state
+.claude/
