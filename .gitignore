@@ -27,3 +27,6 @@ Thumbs.db
 
 # cloned reference (already present, but ignore from project tree)
 /thingsboard/
+
+# ui dependencies
+ui/node_modules/
