@@ -21,15 +21,18 @@ type Props = {
 export default function FlowCanvas({ value, onChange, devices }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
 
-  // Latest telemetry sample per device_id, derived from the SSE stream.
+  // Telemetry samples per device_id, derived from the SSE stream (last N each).
+  const SERIES_LEN = 30;
   const events = useSse('/api/v1/stream');
-  const latestByDevice = useMemo(() => {
-    const out: Record<string, TelemetrySample> = {};
+  const seriesByDevice = useMemo(() => {
+    const out: Record<string, TelemetrySample[]> = {};
     for (const e of events) {
       if (e.type !== 'telemetry') continue;
       const d = e.data as { device_id?: string; time?: string; payload?: Record<string, unknown> };
       if (!d.device_id || !d.time || !d.payload) continue;
-      out[d.device_id] = { time: d.time, payload: d.payload };
+      const arr = out[d.device_id] ?? (out[d.device_id] = []);
+      arr.push({ time: d.time, payload: d.payload });
+      if (arr.length > SERIES_LEN) arr.splice(0, arr.length - SERIES_LEN);
     }
     return out;
   }, [events]);
@@ -80,28 +83,27 @@ export default function FlowCanvas({ value, onChange, devices }: Props) {
     setSelected(null);
   };
 
-  // Decorate device nodes with the device name + latest live telemetry sample.
+  // Decorate device nodes with the device name + recent live telemetry series.
   const displayNodes: Node[] = useMemo(
     () =>
       value.nodes.map((n) => {
         if (n.type === 'device') {
           const deviceId = n.data.device_id as string | undefined;
           const dev = devices.find((d) => d.id === deviceId);
-          const latest = deviceId ? latestByDevice[deviceId] : undefined;
+          const series = deviceId ? (seriesByDevice[deviceId] ?? []) : [];
           return {
             ...n,
             data: {
               ...n.data,
               deviceName: dev?.name,
               deviceId,
-              latestPayload: latest?.payload,
-              latestTime: latest?.time,
+              series,
             },
           } as Node;
         }
         return n as Node;
       }),
-    [value.nodes, devices, latestByDevice],
+    [value.nodes, devices, seriesByDevice],
   );
 
   const selectedNode = selected ? value.nodes.find((n) => n.id === selected) : undefined;
