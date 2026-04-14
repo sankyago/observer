@@ -1,39 +1,37 @@
 import { useState } from 'react';
 import { Layout, Menu } from 'antd';
+import { HomeOutlined, DatabaseOutlined, ApartmentOutlined } from '@ant-design/icons';
 import DevicesPage from '../pages/DevicesPage';
-import ActionsPage from '../pages/ActionsPage';
-import RulesPage from '../pages/RulesPage';
-import LivePage from '../pages/LivePage';
+import FlowsPage from '../pages/FlowsPage';
+import HomePage from '../pages/HomePage';
 
 const { Header, Sider, Content } = Layout;
 
-type Tab = 'devices' | 'actions' | 'rules' | 'live';
+type Tab = 'home' | 'devices' | 'flows';
 
 export default function AppLayout() {
-  const [tab, setTab] = useState<Tab>('live');
+  const [tab, setTab] = useState<Tab>('home');
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={{ color: 'white', fontSize: 20 }}>Observer</Header>
       <Layout>
-        <Sider width={200} theme="light">
+        <Sider width={220} theme="light">
           <Menu
             mode="inline"
             selectedKeys={[tab]}
             onClick={(e) => setTab(e.key as Tab)}
             items={[
-              { key: 'live', label: 'Live' },
-              { key: 'devices', label: 'Devices' },
-              { key: 'actions', label: 'Actions' },
-              { key: 'rules', label: 'Rules' },
+              { key: 'home', icon: <HomeOutlined />, label: 'Home' },
+              { key: 'devices', icon: <DatabaseOutlined />, label: 'Devices' },
+              { key: 'flows', icon: <ApartmentOutlined />, label: 'Flows' },
             ]}
           />
         </Sider>
         <Content style={{ padding: 24, background: 'white' }}>
-          {tab === 'live' && <LivePage />}
+          {tab === 'home' && <HomePage />}
           {tab === 'devices' && <DevicesPage />}
-          {tab === 'actions' && <ActionsPage />}
-          {tab === 'rules' && <RulesPage />}
+          {tab === 'flows' && <FlowsPage />}
         </Content>
       </Layout>
     </Layout>

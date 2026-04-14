@@ -6,27 +6,31 @@ export type Device = {
   created_at: string;
 };
 
-export type Action = {
-  id: string;
-  tenant_id: string;
-  kind: 'log' | 'webhook' | 'email' | 'workflow';
-  config: Record<string, unknown>;
-  created_at: string;
+export type FlowGraph = {
+  nodes: Array<{
+    id: string;
+    type: 'device' | 'condition' | 'action';
+    position: { x: number; y: number };
+    data: Record<string, unknown>;
+  }>;
+  edges: Array<{ id: string; source: string; target: string }>;
 };
 
-export type Rule = {
+export type Flow = {
   id: string;
   tenant_id: string;
-  device_id: string;
-  field: string;
-  op: '>' | '<' | '>=' | '<=' | '=' | '!=';
-  value: number;
-  action_id: string;
+  name: string;
+  graph: FlowGraph;
   enabled: boolean;
   created_at: string;
+  updated_at: string;
 };
 
-export type RuleInput = Omit<Rule, 'id' | 'tenant_id' | 'created_at'>;
+export type FlowInput = {
+  name: string;
+  graph: FlowGraph;
+  enabled: boolean;
+};
 
 const BASE = '/api/v1';
 
@@ -49,17 +53,11 @@ export const api = {
   createDevice: (name: string, type: string) => req<Device>('POST', '/devices', { name, type }),
   deleteDevice: (id: string) => req<void>('DELETE', `/devices/${id}`),
 
-  listActions: () => req<Action[]>('GET', '/actions'),
-  createAction: (kind: Action['kind'], config: Record<string, unknown>) =>
-    req<Action>('POST', '/actions', { kind, config }),
-  updateAction: (id: string, kind: Action['kind'], config: Record<string, unknown>) =>
-    req<Action>('PUT', `/actions/${id}`, { kind, config }),
-  deleteAction: (id: string) => req<void>('DELETE', `/actions/${id}`),
-
-  listRules: () => req<Rule[]>('GET', '/rules'),
-  createRule: (r: RuleInput) => req<Rule>('POST', '/rules', r),
-  updateRule: (id: string, r: RuleInput) => req<Rule>('PUT', `/rules/${id}`, r),
-  deleteRule: (id: string) => req<void>('DELETE', `/rules/${id}`),
+  listFlows: () => req<Flow[]>('GET', '/flows'),
+  getFlow: (id: string) => req<Flow>('GET', `/flows/${id}`),
+  createFlow: (in_: FlowInput) => req<Flow>('POST', '/flows', in_),
+  updateFlow: (id: string, in_: FlowInput) => req<Flow>('PUT', `/flows/${id}`, in_),
+  deleteFlow: (id: string) => req<void>('DELETE', `/flows/${id}`),
 
   recentTelemetry: (deviceId: string, limit = 100) =>
     req<Array<{ time: string; device_id: string; message_id: string; payload: Record<string, unknown> }>>(
