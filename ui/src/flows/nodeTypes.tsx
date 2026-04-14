@@ -3,14 +3,43 @@ import { Card, Tag } from 'antd';
 
 type NodeProps<D> = { data: D };
 
-export type DeviceNodeData = { deviceName?: string; deviceId?: string };
+export type DeviceNodeData = {
+  deviceName?: string;
+  deviceId?: string;
+  latestPayload?: Record<string, unknown>;
+  latestTime?: string;
+};
 export type ConditionNodeData = { field?: string; op?: string; value?: number };
 export type ActionNodeData = { kind?: string; config?: Record<string, unknown> };
 
 export function DeviceNode({ data }: NodeProps<DeviceNodeData>) {
+  const entries = data.latestPayload
+    ? Object.entries(data.latestPayload).filter(([, v]) => v !== null && v !== undefined)
+    : [];
   return (
-    <Card size="small" title="Device" style={{ minWidth: 180 }}>
-      <div>{data.deviceName || <em style={{ color: '#999' }}>select a device</em>}</div>
+    <Card size="small" title="Device" style={{ minWidth: 220 }}>
+      <div style={{ fontWeight: 500 }}>
+        {data.deviceName || <em style={{ color: '#999' }}>select a device</em>}
+      </div>
+      {data.deviceName && (
+        entries.length > 0 ? (
+          <div style={{ marginTop: 6, borderTop: '1px solid #f0f0f0', paddingTop: 6 }}>
+            {entries.map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#666' }}>{k}</span>
+                <code>{typeof v === 'number' ? v.toFixed(2) : String(v)}</code>
+              </div>
+            ))}
+            {data.latestTime && (
+              <div style={{ fontSize: 10, color: '#aaa', marginTop: 4 }}>
+                {new Date(data.latestTime).toLocaleTimeString()}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ marginTop: 6, fontSize: 11, color: '#aaa' }}>waiting for telemetry…</div>
+        )
+      )}
       <Handle type="source" position={Position.Right} />
     </Card>
   );

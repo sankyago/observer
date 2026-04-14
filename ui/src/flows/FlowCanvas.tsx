@@ -8,6 +8,9 @@ import { Button, Card, Form, Input, InputNumber, Select, Space, Typography } fro
 import { nanoid } from 'nanoid';
 import { nodeTypes } from './nodeTypes';
 import type { Device, FlowGraph } from '../api';
+import { useSse } from '../useSse';
+
+type TelemetrySample = { time: string; payload: Record<string, unknown> };
 
 type Props = {
   value: FlowGraph;
@@ -17,6 +20,19 @@ type Props = {
 
 export default function FlowCanvas({ value, onChange, devices }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
+
+  // Latest telemetry sample per device_id, derived from the SSE stream.
+  const events = useSse('/api/v1/stream');
+  const latestByDevice = useMemo(() => {
+    const out: Record<string, TelemetrySample> = {};
+    for (const e of events) {
+      if (e.type !== 'telemetry') continue;
+      const d = e.data as { device_id?: string; time?: string; payload?: Record<string, unknown> };
+      if (!d.device_id || !d.time || !d.payload) continue;
+      out[d.device_id] = { time: d.time, payload: d.payload };
+    }
+    return out;
+  }, [events]);
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => onChange({ ...value, nodes: applyNodeChanges(changes, value.nodes) as FlowGraph['nodes'] }),
@@ -64,17 +80,28 @@ export default function FlowCanvas({ value, onChange, devices }: Props) {
     setSelected(null);
   };
 
-  // Decorate nodes for display (device node shows its device name)
+  // Decorate device nodes with the device name + latest live telemetry sample.
   const displayNodes: Node[] = useMemo(
     () =>
       value.nodes.map((n) => {
         if (n.type === 'device') {
-          const dev = devices.find((d) => d.id === (n.data.device_id as string | undefined));
-          return { ...n, data: { ...n.data, deviceName: dev?.name, deviceId: n.data.device_id } } as Node;
+          const deviceId = n.data.device_id as string | undefined;
+          const dev = devices.find((d) => d.id === deviceId);
+          const latest = deviceId ? latestByDevice[deviceId] : undefined;
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              deviceName: dev?.name,
+              deviceId,
+              latestPayload: latest?.payload,
+              latestTime: latest?.time,
+            },
+          } as Node;
         }
         return n as Node;
       }),
-    [value.nodes, devices],
+    [value.nodes, devices, latestByDevice],
   );
 
   const selectedNode = selected ? value.nodes.find((n) => n.id === selected) : undefined;
