@@ -1,5 +1,5 @@
 import { Layout, Menu } from 'antd';
-import { HomeOutlined, DatabaseOutlined, ApartmentOutlined } from '@ant-design/icons';
+import { ThunderboltOutlined, DatabaseOutlined, ApartmentOutlined } from '@ant-design/icons';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import DevicesPage from '../pages/DevicesPage';
 import FlowsPage from '../pages/FlowsPage';
@@ -11,7 +11,7 @@ const { Header, Sider, Content } = Layout;
 function selectedKey(pathname: string): string {
   if (pathname.startsWith('/devices')) return 'devices';
   if (pathname.startsWith('/flows')) return 'flows';
-  return 'home';
+  return 'live';
 }
 
 export default function AppLayout() {
@@ -27,12 +27,12 @@ export default function AppLayout() {
             mode="inline"
             selectedKeys={[selectedKey(location.pathname)]}
             onClick={(e) => {
-              if (e.key === 'home') navigate('/');
+              if (e.key === 'live') navigate('/');
               if (e.key === 'devices') navigate('/devices');
               if (e.key === 'flows') navigate('/flows');
             }}
             items={[
-              { key: 'home', icon: <HomeOutlined />, label: 'Home' },
+              { key: 'live', icon: <ThunderboltOutlined />, label: 'Live' },
               { key: 'devices', icon: <DatabaseOutlined />, label: 'Devices' },
               { key: 'flows', icon: <ApartmentOutlined />, label: 'Flows' },
             ]}
