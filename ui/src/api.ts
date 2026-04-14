@@ -52,6 +52,8 @@ export const api = {
   listActions: () => req<Action[]>('GET', '/actions'),
   createAction: (kind: Action['kind'], config: Record<string, unknown>) =>
     req<Action>('POST', '/actions', { kind, config }),
+  updateAction: (id: string, kind: Action['kind'], config: Record<string, unknown>) =>
+    req<Action>('PUT', `/actions/${id}`, { kind, config }),
   deleteAction: (id: string) => req<void>('DELETE', `/actions/${id}`),
 
   listRules: () => req<Rule[]>('GET', '/rules'),

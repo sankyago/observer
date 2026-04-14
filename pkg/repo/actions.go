@@ -49,6 +49,19 @@ func CreateAction(ctx context.Context, pool *pgxpool.Pool, tenantID uuid.UUID, k
 	return a, err
 }
 
+func UpdateAction(ctx context.Context, pool *pgxpool.Pool, tenantID, id uuid.UUID, kind string, cfg json.RawMessage) (Action, error) {
+	if len(cfg) == 0 {
+		cfg = json.RawMessage(`{}`)
+	}
+	var a Action
+	err := pool.QueryRow(ctx,
+		`UPDATE actions SET kind=$1, config=$2 WHERE tenant_id=$3 AND id=$4
+		 RETURNING id, tenant_id, kind, config, created_at`,
+		kind, cfg, tenantID, id,
+	).Scan(&a.ID, &a.TenantID, &a.Kind, &a.Config, &a.CreatedAt)
+	return a, err
+}
+
 func DeleteAction(ctx context.Context, pool *pgxpool.Pool, tenantID, id uuid.UUID) error {
 	_, err := pool.Exec(ctx, `DELETE FROM actions WHERE tenant_id=$1 AND id=$2`, tenantID, id)
 	return err

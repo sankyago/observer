@@ -3,32 +3,39 @@ import {
   Button, Drawer, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message,
 } from 'antd';
 import { api, type Action } from '../api';
-import WorkflowCanvas, { emptyWorkflow, toBackendConfig, type WorkflowState } from '../workflows/WorkflowCanvas';
+import WorkflowCanvas, { emptyWorkflow, fromBackendConfig, toBackendConfig, type WorkflowState } from '../workflows/WorkflowCanvas';
 
 export default function ActionsPage() {
   const [rows, setRows] = useState<Action[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // simple-action modal
   const [simpleOpen, setSimpleOpen] = useState(false);
   const [simpleForm] = Form.useForm<{ kind: Action['kind']; url?: string }>();
 
-  // workflow drawer
   const [wfOpen, setWfOpen] = useState(false);
   const [wf, setWf] = useState<WorkflowState>(emptyWorkflow());
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const refresh = async () => {
     setLoading(true);
-    try {
-      setRows(await api.listActions());
-    } catch (e) {
-      message.error(String(e));
-    } finally {
-      setLoading(false);
-    }
+    try { setRows(await api.listActions()); }
+    catch (e) { message.error(String(e)); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { refresh(); }, []);
+
+  const openNewWorkflow = () => {
+    setEditingId(null);
+    setWf(emptyWorkflow());
+    setWfOpen(true);
+  };
+
+  const openEditWorkflow = (a: Action) => {
+    setEditingId(a.id);
+    setWf(fromBackendConfig(a.config));
+    setWfOpen(true);
+  };
 
   const createSimple = async () => {
     const vals = await simpleForm.validateFields();
@@ -36,33 +43,26 @@ export default function ActionsPage() {
     if (vals.kind === 'webhook' && vals.url) config.url = vals.url;
     try {
       await api.createAction(vals.kind, config);
-      setSimpleOpen(false);
-      simpleForm.resetFields();
-      refresh();
-    } catch (e) {
-      message.error(String(e));
-    }
+      setSimpleOpen(false); simpleForm.resetFields(); refresh();
+    } catch (e) { message.error(String(e)); }
   };
 
   const saveWorkflow = async () => {
-    if (wf.nodes.length === 0) {
-      message.error('Drop at least one node');
-      return;
-    }
+    if (wf.nodes.length === 0) { message.error('Drop at least one node'); return; }
     try {
-      await api.createAction('workflow', toBackendConfig(wf));
-      setWfOpen(false);
-      setWf(emptyWorkflow());
-      refresh();
-    } catch (e) {
-      message.error(String(e));
-    }
+      if (editingId) {
+        await api.updateAction(editingId, 'workflow', toBackendConfig(wf));
+      } else {
+        await api.createAction('workflow', toBackendConfig(wf));
+      }
+      setWfOpen(false); setEditingId(null); setWf(emptyWorkflow()); refresh();
+    } catch (e) { message.error(String(e)); }
   };
 
   return (
     <div>
       <Space style={{ marginBottom: 16 }}>
-        <Button type="primary" onClick={() => setWfOpen(true)}>New workflow</Button>
+        <Button type="primary" onClick={openNewWorkflow}>New workflow</Button>
         <Button onClick={() => setSimpleOpen(true)}>New simple action</Button>
         <Button onClick={refresh}>Refresh</Button>
       </Space>
@@ -71,15 +71,17 @@ export default function ActionsPage() {
         rowKey="id"
         loading={loading}
         dataSource={rows}
+        onRow={(r: Action) => ({
+          onClick: () => { if (r.kind === 'workflow') openEditWorkflow(r); },
+          style: r.kind === 'workflow' ? { cursor: 'pointer' } : undefined,
+        })}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 320 },
           {
             title: 'Kind',
             dataIndex: 'kind',
             width: 120,
-            render: (k: string) => (
-              <Tag color={k === 'workflow' ? 'purple' : 'blue'}>{k}</Tag>
-            ),
+            render: (k: string) => <Tag color={k === 'workflow' ? 'purple' : 'blue'}>{k}</Tag>,
           },
           {
             title: 'Config',
@@ -95,20 +97,17 @@ export default function ActionsPage() {
             title: '',
             width: 100,
             render: (_: unknown, r: Action) => (
-              <Popconfirm title="Delete?" onConfirm={() => api.deleteAction(r.id).then(refresh)}>
-                <Button danger size="small">Delete</Button>
-              </Popconfirm>
+              <span onClick={(e) => e.stopPropagation()}>
+                <Popconfirm title="Delete?" onConfirm={() => api.deleteAction(r.id).then(refresh)}>
+                  <Button danger size="small">Delete</Button>
+                </Popconfirm>
+              </span>
             ),
           },
         ]}
       />
 
-      <Modal
-        title="New simple action"
-        open={simpleOpen}
-        onOk={createSimple}
-        onCancel={() => setSimpleOpen(false)}
-      >
+      <Modal title="New simple action" open={simpleOpen} onOk={createSimple} onCancel={() => setSimpleOpen(false)}>
         <Form form={simpleForm} layout="vertical" initialValues={{ kind: 'log' }}>
           <Form.Item name="kind" label="Kind" rules={[{ required: true }]}>
             <Select options={[
@@ -130,14 +129,15 @@ export default function ActionsPage() {
       </Modal>
 
       <Drawer
-        title="New workflow"
+        title={editingId ? `Edit workflow ${editingId.slice(0, 8)}` : 'New workflow'}
         placement="right"
         width={1100}
         open={wfOpen}
-        onClose={() => setWfOpen(false)}
+        onClose={() => { setWfOpen(false); setEditingId(null); }}
+        destroyOnClose
         extra={
           <Space>
-            <Button onClick={() => setWfOpen(false)}>Cancel</Button>
+            <Button onClick={() => { setWfOpen(false); setEditingId(null); }}>Cancel</Button>
             <Button type="primary" onClick={saveWorkflow}>Save</Button>
           </Space>
         }

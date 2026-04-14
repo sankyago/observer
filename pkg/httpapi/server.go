@@ -46,6 +46,7 @@ func BuildRouter(d Deps) http.Handler {
 
 		r.Get("/actions", d.listActions)
 		r.Post("/actions", d.createAction)
+		r.Put("/actions/{id}", d.updateAction)
 		r.Delete("/actions/{id}", d.deleteAction)
 
 		r.Get("/rules", d.listRules)

@@ -35,24 +35,27 @@ export default function WorkflowCanvas({ value, onChange }: Props) {
 
   const addNode = (kind: WorkflowNodeKind) => {
     const id = nanoid(8);
-    const base: Node = {
+    const node: Node = {
       id,
       type: kind,
       position: { x: 80 + Math.random() * 400, y: 80 + Math.random() * 200 },
-      data: {
-        onChange: (patch: Record<string, unknown>) => {
-          onChange({
-            ...value,
-            nodes: value.nodes.map((n) =>
-              n.id === id ? { ...n, data: { ...n.data, ...patch } } : n,
-            ),
-          });
-        },
-        ...defaultDataFor(kind),
-      },
+      data: defaultDataFor(kind),
     };
-    onChange({ ...value, nodes: [...value.nodes, base] });
+    onChange({ ...value, nodes: [...value.nodes, node] });
   };
+
+  const nodesWithHandlers = value.nodes.map((n) => ({
+    ...n,
+    data: {
+      ...n.data,
+      onChange: (patch: Record<string, unknown>) => {
+        onChange({
+          ...value,
+          nodes: value.nodes.map((m) => (m.id === n.id ? { ...m, data: { ...m.data, ...patch } } : m)),
+        });
+      },
+    },
+  }));
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 16 }}>
@@ -64,7 +67,7 @@ export default function WorkflowCanvas({ value, onChange }: Props) {
       </Space>
       <div style={{ height: 420, border: '1px solid #eee' }}>
         <ReactFlow
-          nodes={value.nodes}
+          nodes={nodesWithHandlers}
           edges={value.edges}
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
@@ -90,11 +93,22 @@ function defaultDataFor(kind: WorkflowNodeKind): Record<string, unknown> {
 // Convert UI state to the backend `config` payload: {nodes:[{id,kind,config}], edges:[{source,target}]}
 export function toBackendConfig(s: WorkflowState): Record<string, unknown> {
   return {
-    nodes: s.nodes.map((n) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { onChange: _oc, ...rest } = n.data as Record<string, unknown>;
-      return { id: n.id, kind: n.type, config: rest };
-    }),
+    nodes: s.nodes.map((n) => ({ id: n.id, kind: n.type, config: { ...n.data } })),
     edges: s.edges.map((e) => ({ source: e.source, target: e.target })),
   };
+}
+
+// fromBackendConfig reconstructs WorkflowState from the saved `config` JSONB.
+// The persisted shape is { nodes: [{id, kind, config}], edges: [{source, target}] }.
+export function fromBackendConfig(cfg: Record<string, unknown>): WorkflowState {
+  const rawNodes = (cfg.nodes as Array<{ id: string; kind: string; config?: Record<string, unknown> }> | undefined) ?? [];
+  const rawEdges = (cfg.edges as Array<{ source: string; target: string }> | undefined) ?? [];
+  const nodes: Node[] = rawNodes.map((n, i) => ({
+    id: n.id,
+    type: n.kind,
+    position: { x: 80 + (i % 3) * 260, y: 80 + Math.floor(i / 3) * 160 },
+    data: { ...(n.config ?? {}) },
+  }));
+  const edges: Edge[] = rawEdges.map((e, i) => ({ id: `e${i}`, source: e.source, target: e.target }));
+  return { nodes, edges };
 }
