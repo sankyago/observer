@@ -35,7 +35,7 @@ func Run(ctx context.Context, cfg *config.Config, q queue.Queue, bus *events.Bus
 
 	cache := rules.NewCache()
 	go func() {
-		if err := rules.WatchAndRefresh(ctx, pool, cache, logger); err != nil {
+		if err := rules.WatchBus(ctx, bus, pool, cache, logger); err != nil {
 			logger.Error("rules watcher exited", "err", err)
 		}
 	}()

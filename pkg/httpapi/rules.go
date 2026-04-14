@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/observer-io/observer/pkg/events"
 	"github.com/observer-io/observer/pkg/repo"
 )
 
@@ -34,6 +35,9 @@ func (d Deps) createRule(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if d.Bus != nil {
+		d.Bus.Publish(events.Event{Type: "rules_changed", Data: []byte(`{}`)})
+	}
 	writeJSON(w, http.StatusCreated, out)
 }
 
@@ -57,6 +61,9 @@ func (d Deps) updateRule(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if d.Bus != nil {
+		d.Bus.Publish(events.Event{Type: "rules_changed", Data: []byte(`{}`)})
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -69,6 +76,9 @@ func (d Deps) deleteRule(w http.ResponseWriter, r *http.Request) {
 	if err := repo.DeleteRule(r.Context(), d.Pool, DevTenantID, id); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if d.Bus != nil {
+		d.Bus.Publish(events.Event{Type: "rules_changed", Data: []byte(`{}`)})
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/observer-io/observer/pkg/events"
 	"github.com/observer-io/observer/pkg/models"
 )
 
@@ -33,42 +35,40 @@ func LoadAll(ctx context.Context, pool *pgxpool.Pool) ([]models.Rule, error) {
 	return out, rows.Err()
 }
 
-// WatchAndRefresh runs until ctx is done. On each NOTIFY or on connection failure,
-// it re-runs LoadAll and atomically replaces the cache contents. Logs errors.
-func WatchAndRefresh(ctx context.Context, pool *pgxpool.Pool, cache *Cache, logger *slog.Logger) error {
+// WatchBus subscribes to the events bus and reloads the rule cache whenever a
+// "rules_changed" event arrives. A 30-second ticker provides eventual consistency
+// if an event is missed or the bus is nil.
+func WatchBus(ctx context.Context, bus *events.Bus, pool *pgxpool.Pool, cache *Cache, logger *slog.Logger) error {
 	if err := refresh(ctx, pool, cache); err != nil {
 		logger.Error("rules initial load", "err", err)
 	}
 
+	var sub <-chan events.Event
+	if bus != nil {
+		sub = bus.Subscribe(ctx)
+	}
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
 	for {
-		if err := listenLoop(ctx, pool, cache, logger); err != nil {
-			if ctx.Err() != nil {
-				return nil
-			}
-			logger.Warn("rules listener lost, reconnecting", "err", err)
-		}
-		if ctx.Err() != nil {
+		select {
+		case <-ctx.Done():
 			return nil
-		}
-	}
-}
-
-func listenLoop(ctx context.Context, pool *pgxpool.Pool, cache *Cache, logger *slog.Logger) error {
-	conn, err := pool.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Release()
-
-	if _, err := conn.Exec(ctx, "LISTEN rules_changed"); err != nil {
-		return err
-	}
-	for {
-		if _, err := conn.Conn().WaitForNotification(ctx); err != nil {
-			return err
-		}
-		if err := refresh(ctx, pool, cache); err != nil {
-			logger.Error("rules refresh", "err", err)
+		case <-ticker.C:
+			if err := refresh(ctx, pool, cache); err != nil {
+				logger.Error("rules periodic refresh", "err", err)
+			}
+		case ev, ok := <-sub:
+			if !ok {
+				sub = nil
+				continue
+			}
+			if ev.Type != "rules_changed" {
+				continue
+			}
+			if err := refresh(ctx, pool, cache); err != nil {
+				logger.Error("rules refresh", "err", err)
+			}
 		}
 	}
 }
