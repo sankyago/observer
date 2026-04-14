@@ -3,7 +3,16 @@ export type Device = {
   tenant_id: string;
   name: string;
   type: string;
+  profile_id: string | null;
+  group_id: string | null;
   created_at: string;
+};
+
+export type DeviceInput = {
+  name: string;
+  type: string;
+  profile_id?: string | null;
+  group_id?: string | null;
 };
 
 export type FlowGraph = {
@@ -32,6 +41,44 @@ export type FlowInput = {
   enabled: boolean;
 };
 
+export type DeviceProfile = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  default_fields: string[];
+  created_at: string;
+};
+
+export type DeviceGroup = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  created_at: string;
+};
+
+export type Widget = {
+  id: string;
+  type: 'chart' | 'map' | 'value' | 'alerts';
+  config: Record<string, unknown>;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
+export type DashboardLayout = { widgets: Widget[] };
+
+export type Dashboard = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  layout: DashboardLayout;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DashboardInput = { name: string; layout: DashboardLayout };
+
 const BASE = '/api/v1';
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -50,8 +97,23 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 
 export const api = {
   listDevices: () => req<Device[]>('GET', '/devices'),
-  createDevice: (name: string, type: string) => req<Device>('POST', '/devices', { name, type }),
+  createDevice: (in_: DeviceInput) => req<Device>('POST', '/devices', in_),
+  updateDevice: (id: string, in_: DeviceInput) => req<Device>('PUT', `/devices/${id}`, in_),
   deleteDevice: (id: string) => req<void>('DELETE', `/devices/${id}`),
+
+  listProfiles: () => req<DeviceProfile[]>('GET', '/profiles'),
+  createProfile: (name: string, default_fields: string[]) => req<DeviceProfile>('POST', '/profiles', { name, default_fields }),
+  deleteProfile: (id: string) => req<void>('DELETE', `/profiles/${id}`),
+
+  listGroups: () => req<DeviceGroup[]>('GET', '/groups'),
+  createGroup: (name: string) => req<DeviceGroup>('POST', '/groups', { name }),
+  deleteGroup: (id: string) => req<void>('DELETE', `/groups/${id}`),
+
+  listDashboards: () => req<Dashboard[]>('GET', '/dashboards'),
+  getDashboard: (id: string) => req<Dashboard>('GET', `/dashboards/${id}`),
+  createDashboard: (in_: DashboardInput) => req<Dashboard>('POST', '/dashboards', in_),
+  updateDashboard: (id: string, in_: DashboardInput) => req<Dashboard>('PUT', `/dashboards/${id}`, in_),
+  deleteDashboard: (id: string) => req<void>('DELETE', `/dashboards/${id}`),
 
   listFlows: () => req<Flow[]>('GET', '/flows'),
   getFlow: (id: string) => req<Flow>('GET', `/flows/${id}`),

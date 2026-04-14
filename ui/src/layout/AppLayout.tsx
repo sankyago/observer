@@ -1,17 +1,19 @@
 import { Layout, Menu } from 'antd';
-import { ThunderboltOutlined, DatabaseOutlined, ApartmentOutlined, EnvironmentOutlined } from '@ant-design/icons';
+import { ThunderboltOutlined, DatabaseOutlined, ApartmentOutlined, EnvironmentOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import DevicesPage from '../pages/DevicesPage';
 import FlowsPage from '../pages/FlowsPage';
 import FlowEditorPage from '../pages/FlowEditorPage';
 import HomePage from '../pages/HomePage';
 import MapPage from '../pages/MapPage';
+import { DashboardsListPage, DashboardEditorPage } from '../pages/DashboardsPage';
 
 const { Header, Sider, Content } = Layout;
 
 function selectedKey(pathname: string): string {
   if (pathname.startsWith('/devices')) return 'devices';
   if (pathname.startsWith('/map')) return 'map';
+  if (pathname.startsWith('/dashboards')) return 'dashboards';
   if (pathname.startsWith('/flows')) return 'flows';
   return 'live';
 }
@@ -32,12 +34,14 @@ export default function AppLayout() {
               if (e.key === 'live') navigate('/');
               if (e.key === 'devices') navigate('/devices');
               if (e.key === 'map') navigate('/map');
+              if (e.key === 'dashboards') navigate('/dashboards');
               if (e.key === 'flows') navigate('/flows');
             }}
             items={[
               { key: 'live', icon: <ThunderboltOutlined />, label: 'Live' },
               { key: 'devices', icon: <DatabaseOutlined />, label: 'Devices' },
               { key: 'map', icon: <EnvironmentOutlined />, label: 'Map' },
+              { key: 'dashboards', icon: <AppstoreOutlined />, label: 'Dashboards' },
               { key: 'flows', icon: <ApartmentOutlined />, label: 'Flows' },
             ]}
           />
@@ -47,6 +51,8 @@ export default function AppLayout() {
             <Route path="/" element={<HomePage />} />
             <Route path="/devices" element={<DevicesPage />} />
             <Route path="/map" element={<MapPage />} />
+            <Route path="/dashboards" element={<DashboardsListPage />} />
+            <Route path="/dashboards/:id" element={<DashboardEditorPage />} />
             <Route path="/flows" element={<FlowsPage />} />
             <Route path="/flows/new" element={<FlowEditorPage />} />
             <Route path="/flows/:id" element={<FlowEditorPage />} />

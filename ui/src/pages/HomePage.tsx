@@ -1,67 +1,41 @@
-import { useMemo } from 'react';
-import { List, Tag, Typography } from 'antd';
-import { useSse } from '../useSse';
+import { useEffect, useMemo, useState } from 'react';
+import { Typography } from 'antd';
+import DashboardGrid from '../dashboards/DashboardGrid';
+import { api, type DashboardLayout, type Device } from '../api';
 
-type TelemetryEvt = {
-  type: 'telemetry';
-  data: { time: string; device_id: string; message_id: string; payload: Record<string, unknown> };
-};
-
-type FiredEvt = {
-  type: 'fired';
-  data: {
-    fired_at: string; device_id: string; flow_id: string; node_id: string; kind: string;
-    message_id: string; status: string; error: string; payload: Record<string, unknown>;
-  };
-};
+const DEMO_SENSOR_ID = '11111111-1111-1111-1111-111111111111';
+const BUS_ID = '22222222-2222-2222-2222-222222222222';
 
 export default function HomePage() {
-  const events = useSse('/api/v1/stream');
-  const telemetry = useMemo(
-    () => events.filter((e): e is TelemetryEvt => e.type === 'telemetry').slice(-50).reverse(),
-    [events],
-  );
-  const fired = useMemo(
-    () => events.filter((e): e is FiredEvt => e.type === 'fired').slice(-50).reverse(),
-    [events],
-  );
+  const [devices, setDevices] = useState<Device[]>([]);
+  useEffect(() => { api.listDevices().then(setDevices); }, []);
+
+  const layout: DashboardLayout = useMemo(() => {
+    const hasSensor = devices.some((d) => d.id === DEMO_SENSOR_ID);
+    const hasBus = devices.some((d) => d.id === BUS_ID);
+    const widgets = [];
+    if (hasSensor) {
+      widgets.push({ id: 'v1', type: 'value' as const, config: { device_id: DEMO_SENSOR_ID, field: 'temperature', unit: '°C' }, x: 0, y: 0, w: 3, h: 2 });
+      widgets.push({ id: 'v2', type: 'value' as const, config: { device_id: DEMO_SENSOR_ID, field: 'humidity', unit: '%' }, x: 3, y: 0, w: 3, h: 2 });
+      widgets.push({ id: 'v3', type: 'value' as const, config: { device_id: DEMO_SENSOR_ID, field: 'battery', unit: '%' }, x: 6, y: 0, w: 3, h: 2 });
+      widgets.push({ id: 'c1', type: 'chart' as const, config: { device_id: DEMO_SENSOR_ID }, x: 0, y: 2, w: 9, h: 5 });
+    }
+    if (hasBus) {
+      widgets.push({ id: 'm1', type: 'map' as const, config: { device_id: BUS_ID }, x: 0, y: 7, w: 6, h: 5 });
+    }
+    widgets.push({ id: 'a1', type: 'alerts' as const, config: {}, x: 9, y: 0, w: 3, h: 7 });
+    return { widgets };
+  }, [devices]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-      <div>
-        <Typography.Title level={4}>Live telemetry</Typography.Title>
-        <List
-          bordered
-          size="small"
-          dataSource={telemetry}
-          locale={{ emptyText: 'no messages yet — publish to mqtt://localhost:1883' }}
-          renderItem={(e) => (
-            <List.Item>
-              <Tag color="blue">{new Date(e.data.time).toLocaleTimeString()}</Tag>
-              <code style={{ marginLeft: 8 }}>{e.data.device_id.slice(0, 8)}</code>
-              <code style={{ marginLeft: 8 }}>{JSON.stringify(e.data.payload)}</code>
-            </List.Item>
-          )}
-        />
-      </div>
-      <div>
-        <Typography.Title level={4}>Alerts</Typography.Title>
-        <List
-          bordered
-          size="small"
-          dataSource={fired}
-          locale={{ emptyText: 'no alerts yet' }}
-          renderItem={(e) => (
-            <List.Item>
-              <Tag color={e.data.status === 'ok' ? 'green' : 'red'}>{e.data.status}</Tag>
-              <Tag>{new Date(e.data.fired_at).toLocaleTimeString()}</Tag>
-              <Tag color="purple">{e.data.kind}</Tag>
-              <code style={{ marginLeft: 8 }}>{e.data.device_id.slice(0, 8)}</code>
-              <code style={{ marginLeft: 8 }}>{JSON.stringify(e.data.payload)}</code>
-              {e.data.error && <span style={{ color: 'red', marginLeft: 8 }}>{e.data.error}</span>}
-            </List.Item>
-          )}
-        />
+    <div>
+      <Typography.Title level={4} style={{ margin: 0, marginBottom: 8 }}>Live overview</Typography.Title>
+      <Typography.Text type="secondary">
+        Example dashboard showcasing value tiles, a live chart, a map, and the alerts feed.
+        Build your own on the <strong>Dashboards</strong> page.
+      </Typography.Text>
+      <div style={{ marginTop: 12 }}>
+        <DashboardGrid value={layout} />
       </div>
     </div>
   );
