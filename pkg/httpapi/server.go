@@ -54,7 +54,6 @@ func BuildRouter(d Deps) http.Handler {
 		r.Delete("/rules/{id}", d.deleteRule)
 
 		r.Get("/telemetry/recent", d.recentTelemetry)
-		r.Get("/fired-actions", d.recentFired)
 
 		r.Get("/stream", d.stream)
 	})
