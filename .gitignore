@@ -1,0 +1,29 @@
+# binaries
+/bin/
+*.exe
+*.test
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# env
+.env
+.env.local
+
+# data
+/data/
+*.db
+
+# coverage
+coverage.out
+coverage.html
+
+# os
+.DS_Store
+Thumbs.db
+
+# cloned reference (already present, but ignore from project tree)
+/thingsboard/
