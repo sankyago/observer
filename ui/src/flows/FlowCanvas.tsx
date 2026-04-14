@@ -187,6 +187,7 @@ export default function FlowCanvas({ value, onChange, devices }: Props) {
                   { value: 'log', label: 'log' },
                   { value: 'webhook', label: 'webhook' },
                   { value: 'email', label: 'email' },
+                  { value: 'linear', label: 'linear (create issue)' },
                 ]}
                 onChange={(v) => updateNodeData(selectedNode.id, { kind: v, config: {} })}
               />
@@ -203,6 +204,55 @@ export default function FlowCanvas({ value, onChange, devices }: Props) {
                   }
                 />
               </Form.Item>
+            )}
+            {selectedNode.data.kind === 'linear' && (
+              <>
+                <Form.Item label="API key" required>
+                  <Input.Password
+                    placeholder="lin_api_..."
+                    value={(selectedNode.data.config as { api_key?: string } | undefined)?.api_key || ''}
+                    onChange={(e) =>
+                      updateNodeData(selectedNode.id, {
+                        config: { ...(selectedNode.data.config as Record<string, unknown>), api_key: e.target.value },
+                      })
+                    }
+                  />
+                </Form.Item>
+                <Form.Item label="Team ID" required>
+                  <Input
+                    placeholder="e.g. OBS or the UUID of your team"
+                    value={(selectedNode.data.config as { team_id?: string } | undefined)?.team_id || ''}
+                    onChange={(e) =>
+                      updateNodeData(selectedNode.id, {
+                        config: { ...(selectedNode.data.config as Record<string, unknown>), team_id: e.target.value },
+                      })
+                    }
+                  />
+                </Form.Item>
+                <Form.Item label="Issue title (supports {{field}} templates)">
+                  <Input
+                    placeholder="High temp on {{device_id}}"
+                    value={(selectedNode.data.config as { title?: string } | undefined)?.title || ''}
+                    onChange={(e) =>
+                      updateNodeData(selectedNode.id, {
+                        config: { ...(selectedNode.data.config as Record<string, unknown>), title: e.target.value },
+                      })
+                    }
+                  />
+                </Form.Item>
+                <Form.Item label="Description (optional)">
+                  <Input.TextArea
+                    rows={3}
+                    placeholder="temperature={{temperature}} at {{message_id}}"
+                    value={(selectedNode.data.config as { description?: string } | undefined)?.description || ''}
+                    onChange={(e) =>
+                      updateNodeData(selectedNode.id, {
+                        config: { ...(selectedNode.data.config as Record<string, unknown>), description: e.target.value },
+                      })
+                    }
+                  />
+                </Form.Item>
+              </>
             )}
           </Form>
         )}

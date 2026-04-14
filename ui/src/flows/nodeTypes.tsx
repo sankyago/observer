@@ -122,10 +122,15 @@ export function ActionNode({ data }: NodeProps<ActionNodeData>) {
   return (
     <Card size="small" title="Action" style={{ minWidth: 180 }}>
       <Handle type="target" position={Position.Left} />
-      <Tag color="purple">{data.kind || 'log'}</Tag>
+      <Tag color={data.kind === 'linear' ? 'magenta' : 'purple'}>{data.kind || 'log'}</Tag>
       {data.kind === 'webhook' && (data.config?.url as string | undefined) && (
         <div style={{ fontSize: 11, marginTop: 4, color: '#666', wordBreak: 'break-all' }}>
           {data.config?.url as string}
+        </div>
+      )}
+      {data.kind === 'linear' && (
+        <div style={{ fontSize: 11, marginTop: 4, color: '#666' }}>
+          Team: <code>{(data.config?.team_id as string) || '(not set)'}</code>
         </div>
       )}
       <Handle type="source" position={Position.Right} />

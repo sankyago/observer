@@ -29,6 +29,7 @@ func Run(ctx context.Context, cfg *config.Config, q queue.Queue, bus *events.Bus
 	reg := actions.Registry{
 		Log:     actions.LogAction{Logger: logger},
 		Webhook: actions.WebhookAction{Client: &http.Client{Timeout: 5 * time.Second}},
+		Linear:  actions.LinearAction{Client: &http.Client{Timeout: 10 * time.Second}},
 	}
 
 	logger.Info("runner ready")

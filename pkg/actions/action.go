@@ -26,6 +26,7 @@ type Registry struct {
 	Log     Runner
 	Webhook Runner
 	Email   Runner
+	Linear  Runner
 }
 
 func (r Registry) Run(ctx context.Context, in Input) error {
@@ -45,6 +46,11 @@ func (r Registry) Run(ctx context.Context, in Input) error {
 			return fmt.Errorf("email runner not configured")
 		}
 		return r.Email.Run(ctx, in)
+	case "linear":
+		if r.Linear == nil {
+			return fmt.Errorf("linear runner not configured")
+		}
+		return r.Linear.Run(ctx, in)
 	default:
 		return fmt.Errorf("unknown action kind: %s", in.Kind)
 	}
