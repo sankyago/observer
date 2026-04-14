@@ -25,6 +25,8 @@ services:
       - "18083:18083"
     environment:
       EMQX_DASHBOARD__DEFAULT_PASSWORD: observer
+      EMQX_ALLOW_ANONYMOUS: "true"
+      EMQX_LISTENERS__TCP__DEFAULT__ENABLE_AUTHN: "false"
     healthcheck:
       test: ["CMD", "emqx", "ctl", "status"]
       interval: 10s
