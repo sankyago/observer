@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Button, Form, Input, Modal, Popconfirm, Space, Table, message } from 'antd';
+import { Button, Drawer, Form, Input, Modal, Popconfirm, Space, Table, message } from 'antd';
 import { api, type Device } from '../api';
+import DeviceChart from '../devices/DeviceChart';
 
 export default function DevicesPage() {
   const [rows, setRows] = useState<Device[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<Device | null>(null);
   const [form] = Form.useForm<{ name: string; type: string }>();
 
   const refresh = async () => {
@@ -52,6 +54,7 @@ export default function DevicesPage() {
         rowKey="id"
         loading={loading}
         dataSource={rows}
+        onRow={(r) => ({ onClick: () => setSelected(r), style: { cursor: 'pointer' } })}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 320 },
           { title: 'Name', dataIndex: 'name' },
@@ -60,9 +63,11 @@ export default function DevicesPage() {
             title: '',
             width: 100,
             render: (_, r: Device) => (
-              <Popconfirm title="Delete?" onConfirm={() => onDelete(r.id)}>
-                <Button danger size="small">Delete</Button>
-              </Popconfirm>
+              <span onClick={(e) => e.stopPropagation()}>
+                <Popconfirm title="Delete?" onConfirm={() => onDelete(r.id)}>
+                  <Button danger size="small">Delete</Button>
+                </Popconfirm>
+              </span>
             ),
           },
         ]}
@@ -77,6 +82,16 @@ export default function DevicesPage() {
           </Form.Item>
         </Form>
       </Modal>
+      <Drawer
+        title={selected ? `${selected.name} — telemetry` : ''}
+        placement="right"
+        width={760}
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        destroyOnClose
+      >
+        {selected && <DeviceChart deviceId={selected.id} />}
+      </Drawer>
     </div>
   );
 }
