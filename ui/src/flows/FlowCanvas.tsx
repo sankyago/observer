@@ -113,7 +113,7 @@ export default function FlowCanvas({ value, onChange, devices }: Props) {
         <Button block onClick={() => addNode('device')}>Device</Button>
         <Button block onClick={() => addNode('condition')}>Condition</Button>
         <Button block onClick={() => addNode('action')}>Action</Button>
-        <Button block danger disabled={!selected} onClick={deleteSelected}>Delete selected</Button>
+        <Button block danger disabled={!selected} onClick={deleteSelected}>Delete</Button>
       </Space>
 
       <div style={{ border: '1px solid #eee' }}>
